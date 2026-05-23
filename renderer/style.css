@@ -1,0 +1,318 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100vw;
+  height: 100vh;
+  background: transparent;
+  overflow: hidden;
+  font-family: 'Courier New', monospace;
+}
+
+/* ===== VISHAL ===== */
+#vishal-container {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  width: 140px;
+  height: 240px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  z-index: 100;
+}
+
+#vishal {
+  width: 120px;
+  height: 200px;
+  image-rendering: pixelated;
+  user-select: none;
+  -webkit-user-drag: none;
+  display: block;
+  transition: opacity 0.15s ease;  /* smooth fade between poses */
+}
+
+#vishal-name-tag {
+  margin-top: 8px;
+  padding: 4px 14px;
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  font-size: 13px;
+  font-weight: bold;
+  border-radius: 10px;
+  letter-spacing: 1.5px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ===== THOUGHT BUBBLE (BAADAL) — FORCED SIZE ===== */
+#thought-bubble {
+  position: absolute !important;
+  width: 300px !important;          /* FIXED width — no flexible sizing */
+  min-height: 100px !important;
+  background: #ffffff !important;
+  border: 4px solid #2c2c2c !important;
+  border-radius: 24px !important;
+  padding: 18px 22px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+  z-index: 9999 !important;
+  display: block !important;
+  box-sizing: border-box !important;
+  left: 0;
+  top: 0;
+  opacity: 0;
+  transform: scale(0);
+  transition: opacity 0.3s ease, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: bottom center;
+}
+
+#thought-bubble.visible {
+  opacity: 1 !important;
+  transform: scale(1) !important;
+}
+
+#thought-bubble.hidden {
+  display: none !important;
+}
+
+#bubble-text {
+  display: block !important;
+  font-size: 16px !important;
+  color: #1a1a1a !important;
+  line-height: 1.5 !important;
+  margin-bottom: 14px !important;
+  font-weight: 600 !important;
+  font-family: 'Segoe UI', Arial, sans-serif !important;
+  word-wrap: break-word !important;
+  width: 100% !important;
+}
+
+#bubble-buttons {
+  display: flex !important;
+  gap: 10px !important;
+  flex-wrap: wrap !important;
+  width: 100% !important;
+}
+
+.bubble-btn {
+  padding: 8px 18px !important;
+  background: #4a90e2 !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 14px !important;
+  font-size: 14px !important;
+  font-weight: bold !important;
+  cursor: pointer !important;
+  font-family: 'Segoe UI', Arial, sans-serif !important;
+  transition: transform 0.1s, background 0.2s !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+}
+
+.bubble-btn:hover {
+  background: #357abd !important;
+  transform: scale(1.05);
+}
+
+.bubble-btn:active {
+  transform: scale(0.95);
+}
+
+.bubble-btn.no {
+  background: #e74c3c !important;
+}
+
+.bubble-btn.no:hover {
+  background: #c0392b !important;
+}
+
+.bubble-btn.later {
+  background: #95a5a6 !important;
+}
+
+.bubble-btn.later:hover {
+  background: #7f8c8d !important;
+}
+
+/* Bubble tail (pointing down to Vishal's head) */
+.bubble-tail {
+  position: absolute;
+  bottom: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 16px solid transparent;
+  border-right: 16px solid transparent;
+  border-top: 18px solid #2c2c2c;
+}
+
+.bubble-tail::after {
+  content: '';
+  position: absolute;
+  top: -22px;
+  left: -12px;
+  width: 0;
+  height: 0;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-top: 14px solid #ffffff;
+}
+
+/* ===== LOADING DOTS ===== */
+#bubble-loading {
+  display: flex;
+  gap: 6px;
+  padding: 10px 0;
+  justify-content: center;
+}
+
+#bubble-loading.hidden {
+  display: none !important;
+}
+
+#bubble-loading .dot {
+  width: 8px;
+  height: 8px;
+  background: #2c2c2c;
+  border-radius: 50%;
+  animation: bounce 1.4s infinite ease-in-out;
+}
+
+#bubble-loading .dot:nth-child(1) { animation-delay: -0.32s; }
+#bubble-loading .dot:nth-child(2) { animation-delay: -0.16s; }
+#bubble-loading .dot:nth-child(3) { animation-delay: 0s; }
+
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+/* ===== INPUT AREA ===== */
+#bubble-input-area {
+  display: flex !important;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+  width: 100% !important;
+}
+
+#bubble-input-area.hidden {
+  display: none !important;
+}
+
+#bubble-input {
+  flex: 1;
+  min-width: 0;          /* allows shrinking */
+  padding: 8px 12px !important;
+  border: 2px solid #2c2c2c !important;
+  border-radius: 12px !important;
+  font-size: 14px !important;
+  font-family: 'Segoe UI', Arial, sans-serif !important;
+  outline: none !important;
+  background: #f9f9f9 !important;
+  color: #1a1a1a !important;
+}
+
+#bubble-input:focus {
+  background: #fff !important;
+  border-color: #4a90e2 !important;
+}
+
+#bubble-send-btn {
+  padding: 8px 16px !important;
+  background: #4a90e2 !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 12px !important;
+  font-size: 13px !important;
+  font-weight: bold !important;
+  cursor: pointer !important;
+  font-family: 'Segoe UI', Arial, sans-serif !important;
+  white-space: nowrap;       /* prevents button text wrap */
+  flex-shrink: 0;            /* prevents button shrinking */
+}
+
+#bubble-send-btn:hover {
+  background: #357abd !important;
+}
+
+#bubble-input-area.hidden {
+  display: none !important;
+}
+
+#bubble-input {
+  flex: 1;
+  padding: 8px 12px !important;
+  border: 2px solid #2c2c2c !important;
+  border-radius: 12px !important;
+  font-size: 14px !important;
+  font-family: 'Segoe UI', Arial, sans-serif !important;
+  outline: none !important;
+  background: #f9f9f9 !important;
+  color: #1a1a1a !important;
+}
+
+#bubble-input:focus {
+  background: #fff !important;
+  border-color: #4a90e2 !important;
+}
+
+#bubble-send-btn {
+  padding: 8px 16px !important;
+  background: #4a90e2 !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 12px !important;
+  font-size: 13px !important;
+  font-weight: bold !important;
+  cursor: pointer !important;
+  font-family: 'Segoe UI', Arial, sans-serif !important;
+}
+
+#bubble-send-btn:hover {
+  background: #357abd !important;
+}
+
+#bubble-close-btn {
+  position: absolute !important;
+  top: -10px !important;
+  right: -10px !important;
+  width: 28px !important;
+  height: 28px !important;
+  background: #e74c3c !important;
+  color: white !important;
+  border: 3px solid #2c2c2c !important;
+  border-radius: 50% !important;
+  cursor: pointer !important;
+  font-size: 12px !important;
+  font-weight: bold !important;
+  font-family: 'Segoe UI', sans-serif !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  z-index: 10 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
+  transition: all 0.2s !important;
+  line-height: 1 !important;
+}
+
+#bubble-close-btn:hover {
+  background: #c0392b !important;
+  transform: scale(1.15) !important;
+}
+
+#bubble-close-btn:active {
+  transform: scale(0.95) !important;
+}
+
+#bubble-close-btn:hover {
+  background: #c0392b !important;
+}

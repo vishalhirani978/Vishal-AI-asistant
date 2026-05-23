@@ -1,0 +1,19 @@
+{
+  "name": "pixel-pm",
+  "version": "0.1.0",
+  "description": "Pixel PM — Vishal, your always-on AI project manager",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "author": "Vishal",
+  "devDependencies": {
+    "electron": "^32.0.0"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@octokit/rest": "^19.0.13",
+    "dotenv": "^17.4.2",
+    "groq-sdk": "^1.2.0"
+  }
+}

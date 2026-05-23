@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Vishal — Pixel PM</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Thought Bubble (baadal) -->
+  <div id="thought-bubble" class="hidden">
+    <!-- Close button in top-right corner -->
+    <button id="bubble-close-btn" title="Close">✕</button>
+    
+    <!-- Vishal's message text -->
+    <div id="bubble-text">Hello!</div>
+    
+    <!-- Loading dots while Vishal thinks -->
+    <div id="bubble-loading" class="hidden">
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+    </div>
+    
+    <!-- Preset buttons (Yes/No/Later) -->
+    <div id="bubble-buttons"></div>
+    
+    <!-- Chat input area -->
+    <div id="bubble-input-area" class="hidden">
+      <input type="text" id="bubble-input" placeholder="Type your message..." autocomplete="off">
+      <button id="bubble-send-btn">Send</button>
+    </div>
+    
+    <!-- Pointing tail to Vishal's head -->
+    <div class="bubble-tail"></div>
+  </div>
+
+  <!-- Vishal Character -->
+  <div id="vishal-container">
+    <img id="vishal" src="../assets/character-front.png" alt="Vishal">
+    <div id="vishal-name-tag">Vishal</div>
+  </div>
+
+  <script src="character.js"></script>
+</body>
+</html>
