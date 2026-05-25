@@ -1,5 +1,6 @@
-console.log('Character.js loaded - VERSION WITH GITHUB FIX');
+console.log('Character.js loaded — v1.2.0');
 
+// ===== DOM REFS =====
 const vishal = document.getElementById('vishal');
 const container = document.getElementById('vishal-container');
 const nameTag = document.getElementById('vishal-name-tag');
@@ -12,6 +13,7 @@ const bubbleInput = document.getElementById('bubble-input');
 const bubbleSendBtn = document.getElementById('bubble-send-btn');
 const bubbleCloseBtn = document.getElementById('bubble-close-btn');
 
+// ===== SPRITES =====
 const SPRITES = {
   front: '../assets/character-front.png',
   left: '../assets/character-left.png',
@@ -28,13 +30,23 @@ const SPRITES = {
   phone: '../assets/character-phone.png',
   headphones: '../assets/character-headphones.png',
   laptop: '../assets/character-laptop.png',
-  excited: '../assets/character-excited.png'
+  excited: '../assets/character-excited.png',
 };
 
+// ===== STATE =====
 let isWalking = false;
 let isBusy = false;
 let currentMood = 'front';
 let currentGitHubEvent = null;
+let isDragging = false;
+let charScale = 1.0;
+
+// ===== APPLY SAVED SCALE =====
+function applyScale(scale) {
+  charScale = parseFloat(scale) || 1.0;
+  container.style.transform = `scale(${charScale})`;
+  container.style.transformOrigin = 'bottom right';
+}
 
 // ===== MOOD SYSTEM =====
 function setMood(mood, duration = null) {
@@ -42,7 +54,6 @@ function setMood(mood, duration = null) {
     console.warn(`Unknown mood: ${mood}, using front`);
     mood = 'front';
   }
-  console.log(`Mood: ${currentMood} → ${mood}`);
   currentMood = mood;
   vishal.src = SPRITES[mood];
   if (duration) {
@@ -57,16 +68,184 @@ window.setMood = setMood;
 let bobDirection = 1;
 let bobOffset = 0;
 setInterval(() => {
-  if (isWalking) return;
+  if (isWalking || isDragging) return;
   bobOffset += bobDirection * 0.3;
   if (bobOffset > 4 || bobOffset < 0) bobDirection *= -1;
-  if (vishal) vishal.style.transform = `translateY(${bobOffset}px)`;
+  vishal.style.transform = `translateY(${bobOffset}px)`;
 }, 50);
 
 // ===== HOVER NAME TAG =====
-container.addEventListener('mouseenter', () => nameTag.style.opacity = '1');
-container.addEventListener('mouseleave', () => nameTag.style.opacity = '0');
-vishal.addEventListener('click', () => console.log('Vishal clicked'));
+container.addEventListener('mouseenter', () => (nameTag.style.opacity = '1'));
+container.addEventListener('mouseleave', () => (nameTag.style.opacity = '0'));
+
+// ===== DRAG TO REPOSITION =====
+(function initDrag() {
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let containerStartX = 0;
+  let containerStartY = 0;
+  let hasMoved = false;
+
+  container.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+
+    isDragging = true;
+    hasMoved = false;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+
+    const rect = container.getBoundingClientRect();
+    containerStartX = rect.left;
+    containerStartY = rect.top;
+
+    // ✅ Vishal being touched — make screen interactive
+    window.vishalAPI.vishalActive();
+
+    container.style.right = 'auto';
+    container.style.bottom = 'auto';
+    container.style.left = containerStartX + 'px';
+    container.style.top = containerStartY + 'px';
+    container.style.cursor = 'grabbing';
+
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+
+    const dx = e.clientX - dragStartX;
+    const dy = e.clientY - dragStartY;
+
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      hasMoved = true;
+    }
+
+    const newX = containerStartX + dx;
+    const newY = containerStartY + dy;
+
+    const maxX = window.innerWidth - container.offsetWidth;
+    const maxY = window.innerHeight - container.offsetHeight;
+    const clampedX = Math.max(0, Math.min(newX, maxX));
+    const clampedY = Math.max(0, Math.min(newY, maxY));
+
+    container.style.left = clampedX + 'px';
+    container.style.top = clampedY + 'px';
+
+    if (!bubble.classList.contains('hidden')) {
+      positionBubble();
+    }
+  });
+
+  document.addEventListener('mouseup', (e) => {
+    if (!isDragging) return;
+    isDragging = false;
+    container.style.cursor = 'pointer';
+
+    const rect = container.getBoundingClientRect();
+    window.vishalAPI.savePosition({ x: rect.left, y: rect.top });
+    console.log('📍 Position saved:', rect.left, rect.top);
+
+    // ✅ Drag done + not busy = go idle so screen is clickable again
+    if (!isBusy) {
+      window.vishalAPI.vishalIdle();
+    }
+
+    // Tiny movement = treat as click
+    if (!hasMoved && e.button === 0 && !isBusy) {
+      handleVishalClick();
+    }
+  });
+})();
+
+// ===== RIGHT-CLICK CONTEXT MENU =====
+container.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  window.vishalAPI.showContextMenu(e.screenX, e.screenY);
+});
+
+// ===== LISTEN FOR CONTEXT MENU ACTIONS =====
+if (window.vishalAPI && window.vishalAPI.onContextMenuAction) {
+  window.vishalAPI.onContextMenuAction((action) => {
+    console.log('Context menu action:', action);
+    switch (action) {
+      case 'chat':
+        if (!isBusy) handleVishalClick();
+        break;
+
+      case 'github-status':
+        if (!isBusy) {
+          window.vishalAPI.githubGetSummary().then((summary) => {
+            const message =
+              `📊 GitHub Status:\n` +
+              `• PRs needing review: ${summary.prsNeedingReview}\n` +
+              `• Issues assigned: ${summary.issuesAssigned}\n` +
+              `• Mentions: ${summary.mentions}\n` +
+              `• Build failures (24h): ${summary.buildFailures}`;
+
+            summonWithGitHubBubble({
+              type: 'summary',
+              priority: 'info',
+              title: 'GitHub Summary',
+              message,
+              url: `https://github.com`,
+              actions: ['Open GitHub', 'Done'],
+            });
+          });
+        }
+        break;
+
+      case 'quit':
+        setMood('waving');
+        hideBubble();
+        setTimeout(() => {
+          window.vishalAPI.quitVishal();
+        }, 1500);
+        break;
+
+      default:
+        console.log('Unknown context menu action:', action);
+    }
+  });
+}
+
+// ===== LISTEN FOR SETTINGS CHANGES =====
+if (window.vishalAPI && window.vishalAPI.onSettingsChanged) {
+  window.vishalAPI.onSettingsChanged((settings) => {
+    if (settings.charScale) applyScale(settings.charScale);
+  });
+}
+
+// ===== GO IDLE (screen becomes clickable) =====
+// Called every time Vishal finishes and goes home
+function goIdle() {
+  isBusy = false;
+  window.vishalAPI.summonDone(); // tells main.js
+  window.vishalAPI.vishalIdle(); // restores click-through
+  console.log('✅ Vishal idle — screen clickable');
+}
+
+// ===== CLICK HANDLER =====
+function handleVishalClick() {
+  if (isBusy) return;
+  isBusy = true;
+
+  // ✅ Vishal summoned — disable screen click-through
+  window.vishalAPI.vishalActive();
+
+  const screenW = window.innerWidth;
+  const screenH = window.innerHeight;
+  const centerX = screenW / 2 - 70;
+  const centerY = screenH / 2 - 100;
+
+  walkTo(centerX, centerY, 'left', () => {
+    setMood('thinking');
+    setTimeout(() => {
+      setMood('presenting');
+      showChatBubble("Hey boss! What can I help with?");
+    }, 600);
+  });
+}
 
 // ===== WALKING =====
 function walkTo(targetX, targetY, direction, callback) {
@@ -77,10 +256,11 @@ function walkTo(targetX, targetY, direction, callback) {
   const rect = container.getBoundingClientRect();
   const startX = rect.left;
   const startY = rect.top;
-  const distanceX = targetX - startX;
-  const distanceY = targetY - startY;
-  const duration = 1500;
-  const startTime = performance.now();
+
+  const duration = Math.max(
+    800,
+    Math.min(2000, Math.hypot(targetX - startX, targetY - startY) * 1.2)
+  );
 
   container.style.right = 'auto';
   container.style.bottom = 'auto';
@@ -95,12 +275,16 @@ function walkTo(targetX, targetY, direction, callback) {
     vishal.style.transform = `translateY(-${walkBobOffset}px)`;
   }, 80);
 
+  const startTime = performance.now();
+
   function animate(now) {
     const elapsed = now - startTime;
     const progress = Math.min(elapsed / duration, 1);
     const eased = easeInOutQuad(progress);
-    container.style.left = (startX + distanceX * eased) + 'px';
-    container.style.top = (startY + distanceY * eased) + 'px';
+
+    container.style.left = startX + (targetX - startX) * eased + 'px';
+    container.style.top = startY + (targetY - startY) * eased + 'px';
+
     if (progress < 1) {
       requestAnimationFrame(animate);
     } else {
@@ -112,6 +296,7 @@ function walkTo(targetX, targetY, direction, callback) {
       if (callback) callback();
     }
   }
+
   requestAnimationFrame(animate);
 }
 
@@ -122,8 +307,9 @@ function easeInOutQuad(t) {
 function walkHome(callback) {
   const screenW = window.innerWidth;
   const screenH = window.innerHeight;
-  const homeX = screenW - 140 - 20;
-  const homeY = screenH - 240 - 20;
+  const homeX = screenW - 160;
+  const homeY = screenH - 260;
+
   walkTo(homeX, homeY, 'right', () => {
     container.style.left = 'auto';
     container.style.top = 'auto';
@@ -135,20 +321,22 @@ function walkHome(callback) {
 
 // ===== BUBBLE POSITIONING =====
 function positionBubble() {
-  const BUBBLE_WIDTH = 320;
-  const BUBBLE_ESTIMATED_HEIGHT = 200;
+  const BUBBLE_WIDTH = 300;
+  const BUBBLE_MARGIN = 20;
   const rect = container.getBoundingClientRect();
-  const vishalCenterX = rect.left + (rect.width / 2);
-  
-  let bubbleX = vishalCenterX - (BUBBLE_WIDTH / 2);
-  let bubbleY = rect.top - BUBBLE_ESTIMATED_HEIGHT - 25;
-  
-  if (bubbleX < 10) bubbleX = 10;
-  if (bubbleX + BUBBLE_WIDTH > window.innerWidth - 10) {
-    bubbleX = window.innerWidth - BUBBLE_WIDTH - 10;
+
+  let bubbleX = rect.left + rect.width / 2 - BUBBLE_WIDTH / 2;
+  let bubbleY = rect.top - bubble.offsetHeight - 30;
+
+  bubbleX = Math.max(
+    BUBBLE_MARGIN,
+    Math.min(bubbleX, window.innerWidth - BUBBLE_WIDTH - BUBBLE_MARGIN)
+  );
+
+  if (bubbleY < BUBBLE_MARGIN) {
+    bubbleY = rect.bottom + 30;
   }
-  if (bubbleY < 10) bubbleY = rect.bottom + 25;
-  
+
   bubble.style.left = bubbleX + 'px';
   bubble.style.top = bubbleY + 'px';
 }
@@ -158,13 +346,19 @@ function showChatBubble(message) {
   currentGitHubEvent = null;
   bubbleText.textContent = message;
   bubbleText.style.display = 'block';
+  bubbleText.style.whiteSpace = 'normal';
   bubbleLoading.classList.add('hidden');
   bubbleButtons.innerHTML = '';
   bubbleInputArea.classList.remove('hidden');
-  
+
   positionBubble();
   bubble.classList.remove('hidden');
-  requestAnimationFrame(() => bubble.classList.add('visible'));
+  bubble.style.transform = 'scale(0)';
+  requestAnimationFrame(() => {
+    bubble.style.transform = '';
+    bubble.classList.add('visible');
+  });
+
   setTimeout(() => bubbleInput.focus(), 100);
 }
 
@@ -172,88 +366,109 @@ function showChatBubble(message) {
 function showGitHubBubble(event) {
   console.log('📦 Showing GitHub bubble:', event);
   currentGitHubEvent = event;
-  
+
   bubbleText.textContent = `${event.title}\n${event.message}`;
   bubbleText.style.display = 'block';
   bubbleText.style.whiteSpace = 'pre-line';
   bubbleLoading.classList.add('hidden');
   bubbleInputArea.classList.add('hidden');
-  
+
   bubbleButtons.innerHTML = '';
   (event.actions || ['Done']).forEach((label) => {
     const btn = document.createElement('button');
     btn.className = 'bubble-btn';
     const lower = label.toLowerCase();
-    if (lower.includes('approve')) btn.style.background = '#27ae60';
-    else if (lower.includes('ignore') || lower.includes('later') || lower.includes('skip')) {
+
+    if (lower.includes('approve')) {
+      btn.style.background = '#27ae60';
+    } else if (
+      lower.includes('ignore') ||
+      lower.includes('later') ||
+      lower.includes('skip') ||
+      lower === 'done'
+    ) {
       btn.classList.add('later');
     }
+
     btn.textContent = label;
     btn.onclick = () => handleGitHubAction(label, event);
     bubbleButtons.appendChild(btn);
   });
-  
+
   positionBubble();
   bubble.classList.remove('hidden');
-  requestAnimationFrame(() => bubble.classList.add('visible'));
+  bubble.style.transform = 'scale(0)';
+  requestAnimationFrame(() => {
+    bubble.style.transform = '';
+    bubble.classList.add('visible');
+  });
+}
+
+// ===== SUMMON WITH GITHUB BUBBLE =====
+function summonWithGitHubBubble(event) {
+  if (isBusy) return;
+  isBusy = true;
+
+  // ✅ Vishal summoned — disable screen click-through
+  window.vishalAPI.vishalActive();
+
+  const screenW = window.innerWidth;
+  const screenH = window.innerHeight;
+  const centerX = screenW / 2 - 70;
+  const centerY = screenH / 2 - 100;
+
+  walkTo(centerX, centerY, 'left', () => {
+    let mood = 'presenting';
+    if (event.type === 'build-failure') mood = 'armsCrossed';
+    else if (event.type === 'pr-review') mood = 'pointingRight';
+    else if (event.type === 'issue-assigned') mood = 'thinking';
+    else if (event.type === 'mention') mood = 'waving';
+
+    setMood(mood);
+    setTimeout(() => showGitHubBubble(event), 600);
+  });
 }
 
 // ===== HANDLE GITHUB ACTION =====
 async function handleGitHubAction(action, event) {
-  console.log(`🎬 ACTION CLICKED: "${action}"`);
-  console.log(`🎬 Event:`, event);
-  
+  console.log(`🎬 ACTION: "${action}"`);
   hideBubble();
-  
+
   const lower = action.toLowerCase().trim();
-  
-  // Open URL actions
+
   if (lower.includes('view') || lower.includes('open') || lower.includes('logs')) {
-    console.log('🌐 → URL action');
-    const urlToOpen = event.url || `https://github.com/vishalhirani978`;
-    console.log(`🌐 → Opening: ${urlToOpen}`);
-    
+    const urlToOpen = event.url || `https://github.com`;
+    console.log('🌐 Opening:', urlToOpen);
     try {
-      const result = await window.vishalAPI.githubOpenUrl(urlToOpen);
-      console.log('🌐 → Result:', result);
+      await window.vishalAPI.githubOpenUrl(urlToOpen);
       setMood('pointingRight', 1500);
     } catch (err) {
-      console.error('❌ Open failed:', err);
+      console.error('❌ Open URL failed:', err);
       setMood('armsCrossed', 1500);
     }
-  }
-  // Approve PR
-  else if (lower === 'approve' && event.type === 'pr-review') {
-    console.log('✅ → Approve action');
+  } else if (lower === 'approve' && event.type === 'pr-review') {
     setMood('thinking');
     try {
       const [owner, repo] = event.repo.split('/');
       const result = await window.vishalAPI.githubApprovePR({
-        owner, repo, prNumber: event.number
+        owner,
+        repo,
+        prNumber: event.number,
       });
-      if (result.success) {
-        setMood('thumbsUp', 2000);
-      } else {
-        setMood('armsCrossed', 2000);
-      }
+      setMood(result.success ? 'thumbsUp' : 'armsCrossed', 2000);
     } catch (err) {
-      console.error('❌ Approve error:', err);
+      console.error('❌ Approve failed:', err);
       setMood('armsCrossed', 1500);
     }
-  }
-  // Dismiss
-  else {
-    console.log('👌 → Dismiss action');
+  } else {
     setMood('ok', 1500);
   }
-  
-  // ALWAYS walk home
-  console.log('🏠 Walking home...');
+
+  // Walk home then go idle
   setTimeout(() => {
     walkHome(() => {
-      window.vishalAPI.summonDone();
-      isBusy = false;
-      console.log('✅ Vishal returned home');
+      // ✅ Vishal home — screen clickable again
+      goIdle();
     });
   }, 1800);
 }
@@ -271,13 +486,14 @@ function showBubbleLoading() {
 // ===== HIDE BUBBLE =====
 function hideBubble() {
   bubble.classList.remove('visible');
-  bubble.style.transform = 'scale(0)';
-  setTimeout(() => bubble.classList.add('hidden'), 350);
+  setTimeout(() => {
+    bubble.classList.add('hidden');
+    bubble.style.transform = 'scale(0)';
+  }, 350);
 }
 
 // ===== SEND CHAT MESSAGE =====
 async function sendMessageToVishal(userMessage) {
-  console.log('Sending to Vishal:', userMessage);
   showBubbleLoading();
   setMood('thinking');
   try {
@@ -285,7 +501,7 @@ async function sendMessageToVishal(userMessage) {
     setMood('presenting');
     showChatBubble(result.response);
   } catch (err) {
-    console.error('Error:', err);
+    console.error('Chat error:', err);
     setMood('armsCrossed');
     showChatBubble("Sorry boss, something went wrong. Try again?");
   }
@@ -301,7 +517,7 @@ bubbleSendBtn.addEventListener('click', () => {
 
 bubbleInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') bubbleSendBtn.click();
-  else if (e.key === 'Escape') bubbleCloseBtn.click();
+  if (e.key === 'Escape') bubbleCloseBtn.click();
 });
 
 bubbleCloseBtn.addEventListener('click', () => {
@@ -309,37 +525,67 @@ bubbleCloseBtn.addEventListener('click', () => {
   setMood('waving', 1500);
   setTimeout(() => {
     walkHome(() => {
-      window.vishalAPI.summonDone();
-      isBusy = false;
-      console.log('Vishal returned home');
+      // ✅ Vishal home — screen clickable again
+      goIdle();
     });
   }, 500);
 });
 
-// ===== STARTUP =====
-setTimeout(() => {
-  console.log('Vishal: Waving hello!');
-  setMood('waving', 2500);
-}, 1000);
+// ===== STARTUP: LOAD SAVED POSITION =====
+async function initPosition() {
+  try {
+    const saved = await window.vishalAPI.getPosition();
+    if (saved && saved.x !== null && saved.y !== null) {
+      console.log('📍 Restoring position:', saved);
+      container.style.right = 'auto';
+      container.style.bottom = 'auto';
+      container.style.left = saved.x + 'px';
+      container.style.top = saved.y + 'px';
+    }
+  } catch (e) {
+    console.log('No saved position, using default');
+  }
+}
 
-// ===== LISTEN FOR CHAT SUMMON =====
+// ===== STARTUP SEQUENCE =====
+initPosition().then(() => {
+  setTimeout(() => {
+    setMood('waving', 2500);
+  }, 500);
+});
+
+// ===== STARTUP GREETING (wave only) =====
+if (window.vishalAPI && window.vishalAPI.onStartupGreeting) {
+  window.vishalAPI.onStartupGreeting((data) => {
+    console.log('👋 Startup greeting:', data);
+    // Just wave — no walking, no bubble, no isBusy
+    setMood('waving', 3000);
+    nameTag.style.opacity = '1';
+    setTimeout(() => { nameTag.style.opacity = '0'; }, 3000);
+  });
+}
+
+// ===== LISTEN FOR CHAT SUMMON (hotkey) =====
 if (window.vishalAPI && window.vishalAPI.onSummon) {
   window.vishalAPI.onSummon((data) => {
     console.log('Chat summon received:', data);
-    if (isBusy) { console.log('Busy, ignoring'); return; }
+    if (isBusy) return;
     isBusy = true;
-    
+
+    // ✅ Vishal summoned — disable screen click-through
+    window.vishalAPI.vishalActive();
+
     const screenW = window.innerWidth;
     const screenH = window.innerHeight;
-    const centerX = (screenW / 2) - 70;
-    const centerY = (screenH / 2) - 100;
+    const centerX = screenW / 2 - 70;
+    const centerY = screenH / 2 - 100;
 
     walkTo(centerX, centerY, 'left', () => {
       setMood('thinking');
       setTimeout(() => {
         setMood('presenting');
         showChatBubble(data.message || "Hey boss! What can I help with?");
-      }, 800);
+      }, 600);
     });
   });
 }
@@ -348,28 +594,12 @@ if (window.vishalAPI && window.vishalAPI.onSummon) {
 if (window.vishalAPI && window.vishalAPI.onGitHubEvent) {
   window.vishalAPI.onGitHubEvent((event) => {
     console.log('🐙 GitHub event received:', event);
-    if (isBusy) { console.log('Busy, ignoring event'); return; }
-    isBusy = true;
-    
-    const screenW = window.innerWidth;
-    const screenH = window.innerHeight;
-    const centerX = (screenW / 2) - 70;
-    const centerY = (screenH / 2) - 100;
-
-    walkTo(centerX, centerY, 'left', () => {
-      let moodForEvent = 'presenting';
-      if (event.type === 'build-failure') moodForEvent = 'armsCrossed';
-      else if (event.type === 'pr-review') moodForEvent = 'pointingRight';
-      else if (event.type === 'issue-assigned') moodForEvent = 'thinking';
-      else if (event.type === 'mention') moodForEvent = 'waving';
-      else if (event.type === 'summary') moodForEvent = 'presenting';
-      
-      setMood(moodForEvent);
-      setTimeout(() => {
-        showGitHubBubble(event);
-      }, 800);
-    });
+    if (isBusy) {
+      console.log('Busy, skipping');
+      return;
+    }
+    summonWithGitHubBubble(event);
   });
 }
 
-console.log('Vishal: Ready. Ctrl+Alt+V to chat, Ctrl+Alt+G for GitHub.');
+console.log('✅ Vishal ready. Ctrl+Alt+V chat | Ctrl+Alt+G github | right-click menu | drag to move');

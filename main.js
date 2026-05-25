@@ -1,29 +1,47 @@
-const { app, BrowserWindow, screen, globalShortcut, ipcMain } = require('electron');
+const { app, BrowserWindow, screen, globalShortcut, ipcMain, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
+require('dotenv').config();
+
 const { askVishal, clearMemory } = require('./agents/claude-brain');
 const githubWatcher = require('./agents/github-watcher');
 const githubActions = require('./agents/github-actions');
 
 let mainWindow;
+let settingsWindow = null;
 let screenWidth, screenHeight;
 
 // ===== SETTINGS PERSISTENCE =====
 const settingsPath = path.join(app.getPath('userData'), 'vishal-settings.json');
 
+const DEFAULT_SETTINGS = {
+  position: { x: null, y: null },
+  snoozedUntil: null,
+  personality: 'friendly',
+  charScale: '1.0',
+  chatHotkey: 'CommandOrControl+Alt+V',
+  githubHotkey: 'CommandOrControl+Alt+G',
+  githubEnabled: true,
+  githubInterval: 60,
+  githubUsername: process.env.GITHUB_USERNAME || '',
+  notifyPR: true,
+  notifyIssues: true,
+  notifyMentions: true,
+  notifyBuilds: true,
+  autoStart: false,
+};
+
 function loadSettings() {
   try {
     if (fs.existsSync(settingsPath)) {
       const data = fs.readFileSync(settingsPath, 'utf8');
-      return JSON.parse(data);
+      const saved = JSON.parse(data);
+      return { ...DEFAULT_SETTINGS, ...saved };
     }
   } catch (err) {
     console.error('Failed to load settings:', err);
   }
-  return {
-    position: { x: null, y: null },
-    snoozedUntil: null
-  };
+  return { ...DEFAULT_SETTINGS };
 }
 
 function saveSettings(settings) {
@@ -37,15 +55,18 @@ function saveSettings(settings) {
 
 let appSettings = loadSettings();
 console.log('📁 Settings path:', settingsPath);
-console.log('📦 Loaded settings:', appSettings);
+console.log('📦 Loaded settings:', JSON.stringify(appSettings, null, 2));
 
-// ===== CREATE WINDOW =====
+// ===== CREATE MAIN WINDOW =====
 function createWindow() {
   const display = screen.getPrimaryDisplay().workAreaSize;
   screenWidth = display.width;
   screenHeight = display.height;
 
   console.log('Creating fullscreen transparent window:', screenWidth, 'x', screenHeight);
+
+  const iconPath = path.join(__dirname, 'assets', 'icon.ico');
+  const iconExists = fs.existsSync(iconPath);
 
   mainWindow = new BrowserWindow({
     width: screenWidth,
@@ -59,105 +80,319 @@ function createWindow() {
     resizable: false,
     hasShadow: false,
     focusable: true,
+    ...(iconExists ? { icon: iconPath } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
-    }
+      nodeIntegration: false,
+    },
   });
 
+  // ✅ Start with click-through ON — screen is fully clickable at startup
+  // Vishal is still draggable/clickable via the forward:true option
+  // which forwards mouse events to renderer so CSS pointer-events can catch them
   mainWindow.setIgnoreMouseEvents(true, { forward: true });
+
   mainWindow.loadFile('renderer/index.html');
-  mainWindow.webContents.openDevTools({ mode: 'detach' });
+
+  if (process.env.NODE_ENV === 'development' || process.argv.includes('--dev')) {
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
+  }
 }
 
-// ===== IPC HANDLERS =====
+// ===== OPEN SETTINGS WINDOW =====
+function openSettings() {
+  if (settingsWindow) {
+    settingsWindow.focus();
+    return;
+  }
 
-// Existing: Vishal finished his task
+  const iconPath = path.join(__dirname, 'assets', 'icon.ico');
+  const iconExists = fs.existsSync(iconPath);
+
+  settingsWindow = new BrowserWindow({
+    width: 680,
+    height: 820,
+    title: 'Pixel PM — Settings',
+    autoHideMenuBar: true,
+    resizable: true,
+    minWidth: 500,
+    minHeight: 600,
+    ...(iconExists ? { icon: iconPath } : {}),
+    webPreferences: {
+      preload: path.join(__dirname, 'renderer', 'settings-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  settingsWindow.loadFile(path.join(__dirname, 'renderer', 'settings.html'));
+
+  settingsWindow.on('closed', () => {
+    settingsWindow = null;
+  });
+}
+
+// ===== REGISTER HOTKEYS =====
+function registerHotkeys() {
+  globalShortcut.unregisterAll();
+
+  const chatKey = appSettings.chatHotkey || 'CommandOrControl+Alt+V';
+  const ghKey = appSettings.githubHotkey || 'CommandOrControl+Alt+G';
+
+  const chatOk = globalShortcut.register(chatKey, () => {
+    console.log('>>> CHAT HOTKEY PRESSED <<<');
+    summonVishal("Hey boss! What can I help with?", []);
+  });
+  console.log(`Hotkey ${chatKey} registered:`, chatOk);
+
+  const ghOk = globalShortcut.register(ghKey, async () => {
+    console.log('>>> GITHUB HOTKEY PRESSED <<<');
+    const summary = await githubWatcher.getGitHubSummary();
+
+    const message =
+      `📊 GitHub Status:\n` +
+      `• PRs needing review: ${summary.prsNeedingReview}\n` +
+      `• Issues assigned: ${summary.issuesAssigned}\n` +
+      `• Mentions: ${summary.mentions}\n` +
+      `• Build failures (24h): ${summary.buildFailures}`;
+
+    summonVishalForGitHubEvent({
+      type: 'summary',
+      priority: 'info',
+      title: 'GitHub Summary',
+      message,
+      url: `https://github.com/${process.env.GITHUB_USERNAME}`,
+      actions: ['Open GitHub', 'Done'],
+    });
+  });
+  console.log(`Hotkey ${ghKey} registered:`, ghOk);
+}
+
+// ===== IPC: CORE =====
+
+// ✅ Vishal went home — restore click-through so screen works again
 ipcMain.on('summon-done', () => {
-  console.log('>> Vishal finished — restoring click-through');
-  mainWindow.setIgnoreMouseEvents(true, { forward: true });
+  console.log('>> Vishal home — restoring click-through');
+  if (mainWindow) mainWindow.setIgnoreMouseEvents(true, { forward: true });
 });
 
-// Existing: Get screen size
 ipcMain.handle('get-screen-size', () => {
   return { width: screenWidth, height: screenHeight };
 });
 
-// Existing: Chat with Vishal (Claude/Groq brain)
 ipcMain.handle('ask-vishal', async (event, userMessage) => {
   console.log('>> User asked:', userMessage);
   const result = await askVishal(userMessage);
-  console.log('>> Vishal replied:', result.response);
-  console.log('>> Source:', result.source);
+  console.log('>> Vishal replied:', result.response, '| Source:', result.source);
   return result;
 });
 
-// Existing: Clear conversation memory
 ipcMain.on('clear-memory', () => {
   clearMemory();
 });
 
-// Existing: GitHub — open URL
+// ===== IPC: GITHUB =====
+
 ipcMain.handle('github-open-url', async (event, url) => {
   return githubActions.openInBrowser(url);
 });
 
-// Existing: GitHub — approve PR
 ipcMain.handle('github-approve-pr', async (event, { owner, repo, prNumber }) => {
   return await githubActions.approvePR(owner, repo, prNumber);
 });
 
-// Existing: GitHub — get summary
 ipcMain.handle('github-get-summary', async () => {
   return await githubWatcher.getGitHubSummary();
 });
 
-// NEW: Save Vishal's position when dragged
+// ===== IPC: POSITION =====
+
 ipcMain.on('save-position', (event, position) => {
   appSettings.position = position;
   saveSettings(appSettings);
   console.log('📍 Position saved:', position);
 });
 
-// NEW: Get saved position on startup
 ipcMain.handle('get-position', () => {
   return appSettings.position;
 });
 
-// NEW: Snooze Vishal (don't show notifications for X minutes)
+// ===== IPC: SNOOZE =====
+
 ipcMain.on('snooze-vishal', (event, minutes) => {
-  appSettings.snoozedUntil = Date.now() + (minutes * 60 * 1000);
+  appSettings.snoozedUntil = Date.now() + minutes * 60 * 1000;
   saveSettings(appSettings);
   console.log(`😴 Vishal snoozed for ${minutes} minutes`);
 });
 
-// NEW: Quit Vishal cleanly
+// ===== IPC: MOUSE PASSTHROUGH =====
+
+// ✅ Called when drag starts OR when Vishal is summoned
+// Disables click-through so user can interact with Vishal + bubble
+ipcMain.on('vishal-active', () => {
+  console.log('>> Vishal active — disabling click-through');
+  if (mainWindow) mainWindow.setIgnoreMouseEvents(false);
+});
+
+// ✅ Called when Vishal goes back to corner
+// Re-enables click-through so screen is usable again
+ipcMain.on('vishal-idle', () => {
+  console.log('>> Vishal idle — restoring click-through');
+  if (mainWindow) mainWindow.setIgnoreMouseEvents(true, { forward: true });
+});
+
+// ===== IPC: CONTEXT MENU =====
+
+ipcMain.on('show-context-menu', (event, { x, y }) => {
+  const snoozedUntil = appSettings.snoozedUntil;
+  const isSnoozed = snoozedUntil && Date.now() < snoozedUntil;
+  const minsLeft = isSnoozed
+    ? Math.ceil((snoozedUntil - Date.now()) / 60000)
+    : 0;
+
+  const template = [
+    {
+      label: '💬 Chat with Vishal',
+      click: () => {
+        mainWindow.webContents.send('context-menu-action', 'chat');
+      },
+    },
+    {
+      label: '🐙 GitHub Status',
+      click: () => {
+        mainWindow.webContents.send('context-menu-action', 'github-status');
+      },
+    },
+    { type: 'separator' },
+    {
+      label: isSnoozed
+        ? `😴 Snoozed (${minsLeft}m left) — Click to unsnooze`
+        : '😴 Snooze 30 minutes',
+      click: () => {
+        if (isSnoozed) {
+          appSettings.snoozedUntil = null;
+          saveSettings(appSettings);
+          console.log('🔔 Unsnoozed');
+        } else {
+          appSettings.snoozedUntil = Date.now() + 30 * 60 * 1000;
+          saveSettings(appSettings);
+          console.log('😴 Snoozed 30 min');
+        }
+      },
+    },
+    ...(!isSnoozed
+      ? [
+          {
+            label: '😴 Snooze 1 hour',
+            click: () => {
+              appSettings.snoozedUntil = Date.now() + 60 * 60 * 1000;
+              saveSettings(appSettings);
+              console.log('😴 Snoozed 1 hour');
+            },
+          },
+        ]
+      : []),
+    { type: 'separator' },
+    {
+      label: '⚙️ Settings',
+      click: () => openSettings(),
+    },
+    { type: 'separator' },
+    {
+      label: '👋 Quit Pixel PM',
+      click: () => {
+        mainWindow.webContents.send('context-menu-action', 'quit');
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Pixel PM v1.0.0',
+      enabled: false,
+    },
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  menu.popup({ window: mainWindow, x, y });
+});
+
+// ===== IPC: SETTINGS =====
+
+ipcMain.on('open-settings', () => {
+  openSettings();
+});
+
+ipcMain.handle('settings-load', () => {
+  return appSettings;
+});
+
+ipcMain.handle('settings-save', async (event, newSettings) => {
+  try {
+    appSettings = { ...appSettings, ...newSettings };
+    saveSettings(appSettings);
+
+    app.setLoginItemSettings({
+      openAtLogin: !!appSettings.autoStart,
+      path: process.execPath,
+    });
+
+    registerHotkeys();
+
+    if (mainWindow) {
+      mainWindow.webContents.send('settings-changed', appSettings);
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error('settings-save error:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('settings-get-path', () => {
+  return settingsPath;
+});
+
+ipcMain.on('settings-close', () => {
+  if (settingsWindow) settingsWindow.close();
+});
+
+// ===== IPC: QUIT =====
+
 ipcMain.on('quit-vishal', () => {
   console.log('👋 Goodbye, boss!');
   app.quit();
 });
 
-// ===== SUMMON FUNCTIONS =====
+// ===== SUMMON HELPERS =====
 
 function summonVishal(message, buttons) {
-  console.log('>> Summoning Vishal:', message);
-  mainWindow.setIgnoreMouseEvents(false);
-  mainWindow.webContents.send('summon-vishal', { message, buttons });
+  console.log('>> Summoning Vishal (chat):', message);
+  if (mainWindow) {
+    // ✅ Vishal is being summoned — disable click-through
+    mainWindow.setIgnoreMouseEvents(false);
+    mainWindow.webContents.send('summon-vishal', { message, buttons });
+  }
 }
 
-// UPDATED: Respects snooze setting
 function summonVishalForGitHubEvent(event) {
-  // Check if snoozed
   if (appSettings.snoozedUntil && Date.now() < appSettings.snoozedUntil) {
     const minsLeft = Math.ceil((appSettings.snoozedUntil - Date.now()) / 60000);
-    console.log(`😴 Vishal snoozed for ${minsLeft} more min — skipping event`);
+    console.log(`😴 Snoozed (${minsLeft}m left) — skipping: ${event.title}`);
     return;
   }
-  
-  console.log('>> Summoning Vishal for GitHub event:', event.title);
-  mainWindow.setIgnoreMouseEvents(false);
-  mainWindow.webContents.send('github-event', event);
+
+  if (event.type === 'pr-review' && !appSettings.notifyPR) return;
+  if (event.type === 'issue-assigned' && !appSettings.notifyIssues) return;
+  if (event.type === 'mention' && !appSettings.notifyMentions) return;
+  if (event.type === 'build-failure' && !appSettings.notifyBuilds) return;
+
+  console.log('>> Summoning Vishal (GitHub event):', event.title);
+  if (mainWindow) {
+    // ✅ Vishal is being summoned — disable click-through
+    mainWindow.setIgnoreMouseEvents(false);
+    mainWindow.webContents.send('github-event', event);
+  }
 }
 
 // ===== APP STARTUP =====
@@ -165,39 +400,16 @@ function summonVishalForGitHubEvent(event) {
 app.whenReady().then(async () => {
   createWindow();
 
-  // Hotkey: Ctrl+Alt+V — chat with Vishal
-  const chatHotkey = globalShortcut.register('CommandOrControl+Alt+V', () => {
-    console.log('>>> CHAT HOTKEY PRESSED <<<');
-    summonVishal("Hey boss! What can I help with?", []);
-  });
-  if (chatHotkey) console.log('OK Hotkey Ctrl+Alt+V registered (chat)');
+  registerHotkeys();
 
-  // Hotkey: Ctrl+Alt+G — GitHub summary
-  const ghHotkey = globalShortcut.register('CommandOrControl+Alt+G', async () => {
-    console.log('>>> GITHUB HOTKEY PRESSED <<<');
-    const summary = await githubWatcher.getGitHubSummary();
-    
-    const message = `📊 GitHub Status:
-• PRs needing review: ${summary.prsNeedingReview}
-• Issues assigned: ${summary.issuesAssigned}
-• Mentions: ${summary.mentions}
-• Build failures (24h): ${summary.buildFailures}`;
-    
-    summonVishalForGitHubEvent({
-      type: 'summary',
-      priority: 'info',
-      title: 'GitHub Summary',
-      message: message,
-      actions: ['Open GitHub', 'Done']
-    });
+  app.setLoginItemSettings({
+    openAtLogin: !!appSettings.autoStart,
+    path: process.execPath,
   });
-  if (ghHotkey) console.log('OK Hotkey Ctrl+Alt+G registered (github)');
 
-  // Verify GitHub connection
   const ghStatus = await githubWatcher.verifyConnection();
-  
+
   if (ghStatus.success) {
-    // Start GitHub watcher
     githubWatcher.startWatcher((event) => {
       console.log('🚨 New GitHub event:', event.title);
       summonVishalForGitHubEvent(event);
@@ -206,14 +418,17 @@ app.whenReady().then(async () => {
     console.error('❌ Skipping GitHub watcher — connection failed');
   }
 
-  // AUTO-TEST: greet user after 5 seconds
+  // ✅ Startup: just wave, no bubble, no walking to center
   setTimeout(() => {
     console.log('=== STARTUP GREETING ===');
-    summonVishal(
-      `Hey boss! I'm connected to GitHub @${process.env.GITHUB_USERNAME}. Press Ctrl+Alt+G for status, Ctrl+Alt+V to chat!`,
-      []
-    );
-  }, 5000);
+    const username = process.env.GITHUB_USERNAME || 'you';
+    if (mainWindow) {
+      mainWindow.webContents.send('startup-greeting', {
+        connected: ghStatus.success,
+        username,
+      });
+    }
+  }, 3000);
 });
 
 app.on('will-quit', () => {

@@ -1,3 +1,25 @@
+# Dependencies
 node_modules/
+
+# Build output
+dist/
+
+# Secrets — NEVER commit this
 .env
+
+# Electron cache
+.electron/
+
+# Logs
 *.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Lock file (optional — remove this line if you want to commit it)
+# package-lock.json
+
+# Stale subfolder — this was an error
+pixel-pm/

@@ -4,28 +4,50 @@ console.log('Preload: starting');
 
 try {
   contextBridge.exposeInMainWorld('vishalAPI', {
-    // Chat
-    onSummon: (callback) => ipcRenderer.on('summon-vishal', (event, data) => callback(data)),
+
+    // ===== MOUSE PASSTHROUGH =====
+    vishalActive: () => ipcRenderer.send('vishal-active'),
+    vishalIdle: () => ipcRenderer.send('vishal-idle'),
+
+    // ===== STARTUP =====
+    onStartupGreeting: (callback) =>
+      ipcRenderer.on('startup-greeting', (event, data) => callback(data)),
+
+    // ===== CHAT =====
+    onSummon: (callback) =>
+      ipcRenderer.on('summon-vishal', (event, data) => callback(data)),
     summonDone: () => ipcRenderer.send('summon-done'),
     getScreenSize: () => ipcRenderer.invoke('get-screen-size'),
     askVishal: (message) => ipcRenderer.invoke('ask-vishal', message),
     clearMemory: () => ipcRenderer.send('clear-memory'),
-    
-    // GitHub
-    onGitHubEvent: (callback) => ipcRenderer.on('github-event', (event, data) => callback(data)),
+
+    // ===== GITHUB =====
+    onGitHubEvent: (callback) =>
+      ipcRenderer.on('github-event', (event, data) => callback(data)),
     githubOpenUrl: (url) => ipcRenderer.invoke('github-open-url', url),
     githubApprovePR: (params) => ipcRenderer.invoke('github-approve-pr', params),
     githubGetSummary: () => ipcRenderer.invoke('github-get-summary'),
-    
-    // NEW: Position memory
+
+    // ===== POSITION MEMORY =====
     savePosition: (position) => ipcRenderer.send('save-position', position),
     getPosition: () => ipcRenderer.invoke('get-position'),
-    
-    // NEW: Snooze
+
+    // ===== SNOOZE =====
     snoozeVishal: (minutes) => ipcRenderer.send('snooze-vishal', minutes),
-    
-    // NEW: Quit
-    quitVishal: () => ipcRenderer.send('quit-vishal')
+
+    // ===== CONTEXT MENU =====
+    showContextMenu: (x, y) => ipcRenderer.send('show-context-menu', { x, y }),
+    onContextMenuAction: (callback) =>
+      ipcRenderer.on('context-menu-action', (event, action) => callback(action)),
+
+    // ===== SETTINGS =====
+    openSettings: () => ipcRenderer.send('open-settings'),
+    onSettingsChanged: (callback) =>
+      ipcRenderer.on('settings-changed', (event, settings) => callback(settings)),
+
+    // ===== QUIT =====
+    quitVishal: () => ipcRenderer.send('quit-vishal'),
+
   });
   console.log('Preload: vishalAPI exposed successfully');
 } catch (err) {

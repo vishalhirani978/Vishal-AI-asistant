@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Pixel PM — Settings</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      padding: 28px 32px 80px;
+      min-height: 100vh;
+    }
+
+    h1 {
+      font-size: 22px;
+      color: #64b5f6;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      color: #666;
+      font-size: 12px;
+      margin-bottom: 28px;
+    }
+
+    .section {
+      background: #16213e;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 16px;
+      border: 1px solid #1e2a4a;
+    }
+
+    .section h2 {
+      font-size: 14px;
+      color: #90caf9;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #1e2a4a;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #1a2040;
+    }
+
+    .row:last-child { border-bottom: none; }
+
+    .label-wrap { display: flex; flex-direction: column; gap: 2px; }
+    .label-name { font-size: 13px; font-weight: 600; }
+    .label-desc { font-size: 11px; color: #666; }
+
+    select, input[type="text"], input[type="number"] {
+      background: #0f3460;
+      color: #e0e0e0;
+      border: 1px solid #1e2a4a;
+      border-radius: 8px;
+      padding: 7px 12px;
+      font-size: 13px;
+      outline: none;
+      min-width: 180px;
+      transition: border-color 0.2s;
+    }
+
+    select:focus, input:focus { border-color: #64b5f6; }
+
+    /* Toggle */
+    .toggle { position: relative; width: 44px; height: 24px; cursor: pointer; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle .slider {
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background: #333; border-radius: 24px; transition: 0.3s;
+    }
+    .toggle .slider::before {
+      content: ''; position: absolute;
+      width: 18px; height: 18px; left: 3px; bottom: 3px;
+      background: #aaa; border-radius: 50%; transition: 0.3s;
+    }
+    .toggle input:checked + .slider { background: #4caf50; }
+    .toggle input:checked + .slider::before { transform: translateX(20px); background: white; }
+
+    /* Hotkey recorder */
+    .hotkey-box {
+      background: #0f3460;
+      border: 1px solid #1e2a4a;
+      border-radius: 8px;
+      padding: 7px 14px;
+      font-size: 13px;
+      font-family: 'Consolas', monospace;
+      min-width: 180px;
+      text-align: center;
+      cursor: pointer;
+      user-select: none;
+      transition: border-color 0.2s;
+    }
+    .hotkey-box.recording {
+      border-color: #ff9800;
+      background: #1a1000;
+      animation: blink 0.8s infinite;
+    }
+    @keyframes blink {
+      0%, 100% { border-color: #ff9800; }
+      50% { border-color: #ff5722; }
+    }
+
+    /* Buttons */
+    .btn-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      padding: 14px 32px;
+      background: #101828;
+      border-top: 1px solid #1e2a4a;
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .btn {
+      padding: 9px 24px; border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+    }
+    .btn-save { background: #4caf50; color: white; }
+    .btn-save:hover { background: #43a047; }
+    .btn-cancel { background: #2a2a3e; color: #aaa; }
+    .btn-cancel:hover { background: #333; }
+    .btn-reset { background: transparent; color: #f44336; border: 1px solid #f44336; margin-right: auto; }
+    .btn-reset:hover { background: rgba(244,67,54,0.1); }
+
+    /* Toast */
+    .toast {
+      position: fixed; top: 16px; right: 16px;
+      background: #4caf50; color: white;
+      padding: 10px 20px; border-radius: 8px;
+      font-size: 13px; font-weight: 600;
+      transform: translateX(200px); opacity: 0;
+      transition: all 0.3s ease; z-index: 999;
+    }
+    .toast.show { transform: translateX(0); opacity: 1; }
+
+    .settings-path {
+      font-size: 10px; color: #444; margin-right: auto;
+      font-family: 'Consolas', monospace;
+      max-width: 300px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+
+<div class="toast" id="toast">✓ Settings saved!</div>
+
+<h1>⚙️ Pixel PM Settings</h1>
+<p class="subtitle">Customize Vishal's behavior, hotkeys, and integrations</p>
+
+<!-- General -->
+<div class="section">
+  <h2>General</h2>
+
+  <div class="row">
+    <div class="label-wrap">
+      <span class="label-name">Launch on startup</span>
+      <span class="label-desc">Start Pixel PM when Windows boots</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="autoStart"><span class="slider"></span></label>
+  </div>
+
+  <div class="row">
+    <div class="label-wrap">
+      <span class="label-name">Personality style</span>
+      <span class="label-desc">How Vishal talks to you</span>
+    </div>
+    <select id="personality">
+      <option value="friendly">Friendly (calls you "boss")</option>
+      <option value="professional">Professional</option>
+      <option value="sarcastic">Sarcastic / Witty</option>
+      <option value="minimal">Minimal (short answers)</option>
+    </select>
+  </div>
+
+  <div class="row">
+    <div class="label-wrap">
+      <span class="label-name">Character scale</span>
+      <span class="label-desc">Visual size of Vishal on screen</span>
+    </div>
+    <select id="charScale">
+      <option value="0.8">Small (80%)</option>
+      <option value="1.0">Normal (100%)</option>
+      <option value="1.2">Large (120%)</option>
+      <option value="1.5">Extra Large (150%)</option>
+    </select>
+  </div>
+</div>
+
+<!-- Hotkeys -->
+<div class="section">
+  <h2>Hotkeys</h2>
+  <p style="font-size:11px;color:#555;margin-bottom:12px;">Click a hotkey box, then press your desired key combination</p>
+
+  <div class="row">
+    <div class="label-wrap">
+      <span class="label-name">Open Chat</span>
+      <span class="label-desc">Summon Vishal for a chat</span>
+    </div>
+    <div class="hotkey-box" id="hotkeyChat" data-field="chatHotkey" tabindex="0">Ctrl+Alt+V</div>
+  </div>
+
+  <div class="row">
+    <div class="label-wrap">
+      <span class="label-name">GitHub Summary</span>
+      <span class="label-desc">Quick GitHub status check</span>
+    </div>
+    <div class="hotkey-box" id="hotkeyGithub" data-field="githubHotkey" tabindex="0">Ctrl+Alt+G</div>
+  </div>
+</div>
+
+<!-- GitHub -->
+<div class="section">
+  <h2>GitHub Integration</h2>
+
+  <div class="row">
+    <div class="label-wrap">
+      <span class="label-name">Enable GitHub watcher</span>
+      <span class="label-desc">Background monitoring every 60s</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="githubEnabled" checked><span class="slider"></span></label>
+  </div>
+
+  <div class="row">
+    <div class="label-wrap">
+      <span class="label-name">Check interval (seconds)</span>
+      <span class="label-desc">Min 30s, max 600s</span>
+    </div>
+    <input type="number" id="githubInterval" value="60" min="30" max="600" step="10" style="min-width:120px;">
+  </div>
+</div>
+
+<!-- Notifications -->
+<div class="section">
+  <h2>Notifications</h2>
+
+  <div class="row">
+    <div class="label-wrap">
+      <span class="label-name">New PRs needing review</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="notifyPR" checked><span class="slider"></span></label>
+  </div>
+
+  <div class="row">
+    <div class="label-wrap">
+      <span class="label-name">Issues assigned to you</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="notifyIssues" checked><span class="slider"></span></label>
+  </div>
+
+  <div class="row">
+    <div class="label-wrap">
+      <span class="label-name">Mentions (@you)</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="notifyMentions" checked><span class="slider"></span></label>
+  </div>
+
+  <div class="row">
+    <div class="label-wrap">
+      <span class="label-name">Build / CI failures</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="notifyBuilds" checked><span class="slider"></span></label>
+  </div>
+</div>
+
+<div class="btn-bar">
+  <span class="settings-path" id="settingsPath">Loading path...</span>
+  <button class="btn btn-reset" id="btnReset">Reset Defaults</button>
+  <button class="btn btn-cancel" id="btnCancel">Cancel</button>
+  <button class="btn btn-save" id="btnSave">Save Settings</button>
+</div>
+
+<script>
+  // Electron hotkeys use CommandOrControl, display uses Ctrl
+  function toDisplay(key) {
+    return (key || '').replace('CommandOrControl', 'Ctrl');
+  }
+  function toElectron(key) {
+    return (key || '').replace('Ctrl', 'CommandOrControl');
+  }
+
+  const DEFAULTS = {
+    autoStart: false,
+    personality: 'friendly',
+    charScale: '1.0',
+    chatHotkey: 'CommandOrControl+Alt+V',
+    githubHotkey: 'CommandOrControl+Alt+G',
+    githubEnabled: true,
+    githubInterval: 60,
+    notifyPR: true,
+    notifyIssues: true,
+    notifyMentions: true,
+    notifyBuilds: true,
+  };
+
+  let current = { ...DEFAULTS };
+
+  function applyToUI(s) {
+    document.getElementById('autoStart').checked = !!s.autoStart;
+    document.getElementById('personality').value = s.personality || 'friendly';
+    document.getElementById('charScale').value = s.charScale || '1.0';
+    document.getElementById('hotkeyChat').textContent = toDisplay(s.chatHotkey || DEFAULTS.chatHotkey);
+    document.getElementById('hotkeyGithub').textContent = toDisplay(s.githubHotkey || DEFAULTS.githubHotkey);
+    document.getElementById('githubEnabled').checked = s.githubEnabled !== false;
+    document.getElementById('githubInterval').value = s.githubInterval || 60;
+    document.getElementById('notifyPR').checked = s.notifyPR !== false;
+    document.getElementById('notifyIssues').checked = s.notifyIssues !== false;
+    document.getElementById('notifyMentions').checked = s.notifyMentions !== false;
+    document.getElementById('notifyBuilds').checked = s.notifyBuilds !== false;
+  }
+
+  function readFromUI() {
+    return {
+      autoStart: document.getElementById('autoStart').checked,
+      personality: document.getElementById('personality').value,
+      charScale: document.getElementById('charScale').value,
+      chatHotkey: toElectron(document.getElementById('hotkeyChat').textContent),
+      githubHotkey: toElectron(document.getElementById('hotkeyGithub').textContent),
+      githubEnabled: document.getElementById('githubEnabled').checked,
+      githubInterval: parseInt(document.getElementById('githubInterval').value) || 60,
+      notifyPR: document.getElementById('notifyPR').checked,
+      notifyIssues: document.getElementById('notifyIssues').checked,
+      notifyMentions: document.getElementById('notifyMentions').checked,
+      notifyBuilds: document.getElementById('notifyBuilds').checked,
+    };
+  }
+
+  // Load
+  async function init() {
+    try {
+      if (window.settingsAPI) {
+        const saved = await window.settingsAPI.load();
+        if (saved) {
+          current = { ...DEFAULTS, ...saved };
+        }
+        const p = await window.settingsAPI.getPath();
+        document.getElementById('settingsPath').textContent = p;
+      }
+    } catch (e) {
+      console.log('Load failed, using defaults');
+    }
+    applyToUI(current);
+  }
+
+  init();
+
+  // Hotkey recording
+  let recording = null;
+
+  document.querySelectorAll('.hotkey-box').forEach(el => {
+    el.addEventListener('click', () => {
+      if (recording) {
+        recording.classList.remove('recording');
+        // restore previous text
+        const field = recording.dataset.field;
+        recording.textContent = toDisplay(current[field] || '');
+      }
+      recording = el;
+      el.classList.add('recording');
+      el.textContent = 'Press keys...';
+    });
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (!recording) return;
+    e.preventDefault();
+
+    const parts = [];
+    if (e.ctrlKey) parts.push('Ctrl');
+    if (e.altKey) parts.push('Alt');
+    if (e.shiftKey) parts.push('Shift');
+    if (e.metaKey) parts.push('Super');
+
+    if (!['Control','Alt','Shift','Meta'].includes(e.key)) {
+      parts.push(e.key.length === 1 ? e.key.toUpperCase() : e.key);
+      const combo = parts.join('+');
+      recording.textContent = combo;
+      recording.classList.remove('recording');
+      recording = null;
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (recording && !e.target.classList.contains('hotkey-box')) {
+      const field = recording.dataset.field;
+      recording.textContent = toDisplay(current[field] || '');
+      recording.classList.remove('recording');
+      recording = null;
+    }
+  });
+
+  // Save
+  document.getElementById('btnSave').addEventListener('click', async () => {
+    const settings = readFromUI();
+    current = { ...current, ...settings };
+
+    if (window.settingsAPI) {
+      const result = await window.settingsAPI.save(settings);
+      if (result && result.success === false) {
+        alert('Failed to save: ' + result.error);
+        return;
+      }
+    }
+
+    const toast = document.getElementById('toast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2200);
+  });
+
+  // Cancel
+  document.getElementById('btnCancel').addEventListener('click', () => {
+    if (window.settingsAPI) window.settingsAPI.close();
+    else window.close();
+  });
+
+  // Reset
+  document.getElementById('btnReset').addEventListener('click', () => {
+    if (confirm('Reset all settings to defaults?')) {
+      current = { ...DEFAULTS };
+      applyToUI(current);
+    }
+  });
+</script>
+</body>
+</html>

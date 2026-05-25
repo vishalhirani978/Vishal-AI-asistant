@@ -316,3 +316,26 @@ html, body {
 #bubble-close-btn:hover {
   background: #c0392b !important;
 }
+/* ===== POINTER EVENT CONTROL ===== */
+
+/* 
+  Body is transparent overlay — pass all clicks through to apps below
+  EXCEPT on Vishal and the bubble
+*/
+body {
+  pointer-events: none !important;
+}
+
+/* Vishal character — always clickable and draggable */
+#vishal-container {
+  pointer-events: all !important;
+}
+
+/* Bubble — only clickable when visible */
+#thought-bubble.visible {
+  pointer-events: all !important;
+}
+
+#thought-bubble.hidden {
+  pointer-events: none !important;
+}

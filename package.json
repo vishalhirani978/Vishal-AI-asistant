@@ -1,19 +1,70 @@
 {
   "name": "pixel-pm",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Pixel PM — Vishal, your always-on AI project manager",
   "main": "main.js",
+  "author": "Vishal Hirani <vishalhirani978@gmail.com>",
+  "license": "MIT",
   "scripts": {
-    "start": "electron ."
-  },
-  "author": "Vishal",
-  "devDependencies": {
-    "electron": "^32.0.0"
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder --win",
+    "build:dir": "electron-builder --win --dir"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@octokit/rest": "^19.0.13",
     "dotenv": "^17.4.2",
     "groq-sdk": "^1.2.0"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.vishalhirani.pixelpm",
+    "productName": "Pixel PM",
+    "copyright": "Copyright © 2025 Vishal Hirani",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "agents/**/*",
+      "renderer/**/*",
+      "assets/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "extraFiles": [
+      {
+        "from": ".env",
+        "to": ".env",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Pixel PM",
+      "deleteAppDataOnUninstall": false
+    }
   }
 }
