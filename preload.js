@@ -21,6 +21,10 @@ try {
     askVishal: (message) => ipcRenderer.invoke('ask-vishal', message),
     clearMemory: () => ipcRenderer.send('clear-memory'),
 
+    // ===== WHISPER TRANSCRIPTION =====
+    transcribeAudio: (audioData, mimeType) =>
+      ipcRenderer.invoke('transcribe-audio', { audioData, mimeType }),
+
     // ===== GITHUB =====
     onGitHubEvent: (callback) =>
       ipcRenderer.on('github-event', (event, data) => callback(data)),
@@ -44,6 +48,10 @@ try {
     openSettings: () => ipcRenderer.send('open-settings'),
     onSettingsChanged: (callback) =>
       ipcRenderer.on('settings-changed', (event, settings) => callback(settings)),
+
+    // ===== VOICE INPUT =====
+    onStartVoiceInput: (callback) =>
+      ipcRenderer.on('start-voice-input', () => callback()),
 
     // ===== QUIT =====
     quitVishal: () => ipcRenderer.send('quit-vishal'),

@@ -1,4 +1,4 @@
-console.log('Character.js loaded — v1.2.0');
+console.log('Character.js loaded — v1.4.0 (with Whisper voice input)');
 
 // ===== DOM REFS =====
 const vishal = document.getElementById('vishal');
@@ -11,6 +11,7 @@ const bubbleLoading = document.getElementById('bubble-loading');
 const bubbleInputArea = document.getElementById('bubble-input-area');
 const bubbleInput = document.getElementById('bubble-input');
 const bubbleSendBtn = document.getElementById('bubble-send-btn');
+const bubbleMicBtn = document.getElementById('bubble-mic-btn');
 const bubbleCloseBtn = document.getElementById('bubble-close-btn');
 
 // ===== SPRITES =====
@@ -40,6 +41,12 @@ let currentMood = 'front';
 let currentGitHubEvent = null;
 let isDragging = false;
 let charScale = 1.0;
+let isListening = false;
+let isTranscribing = false;
+let mediaRecorder = null;
+let audioChunks = [];
+let audioStream = null;
+let moodBeforeListening = 'presenting';
 
 // ===== APPLY SAVED SCALE =====
 function applyScale(scale) {
@@ -63,6 +70,205 @@ function setMood(mood, duration = null) {
   }
 }
 window.setMood = setMood;
+
+// ===== START RECORDING =====
+async function startListening() {
+  if (isBusy && !bubble.classList.contains('visible')) return;
+  if (isListening || isTranscribing) return;
+
+  try {
+    console.log('🎤 Requesting microphone...');
+    
+    audioStream = await navigator.mediaDevices.getUserMedia({ 
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        sampleRate: 16000,
+      } 
+    });
+
+    console.log('✅ Microphone access granted');
+
+    // Create MediaRecorder
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? 'audio/webm;codecs=opus'
+      : 'audio/webm';
+
+    mediaRecorder = new MediaRecorder(audioStream, { mimeType });
+    audioChunks = [];
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        audioChunks.push(event.data);
+      }
+    };
+
+    mediaRecorder.onstop = async () => {
+      console.log('🎤 Recording stopped, processing...');
+      
+      // Stop all audio tracks
+      if (audioStream) {
+        audioStream.getTracks().forEach(track => track.stop());
+        audioStream = null;
+      }
+
+      // Process the recording
+      await processRecording();
+    };
+
+    mediaRecorder.onerror = (event) => {
+      console.error('🎤 MediaRecorder error:', event.error);
+      stopListening();
+    };
+
+    // Start recording
+    mediaRecorder.start();
+    isListening = true;
+
+    // Vishal puts on headphones
+    moodBeforeListening = currentMood;
+    setMood('headphones');
+
+    // Update UI
+    bubbleMicBtn.classList.add('listening');
+    bubbleMicBtn.textContent = '⏹';
+    bubbleMicBtn.title = 'Click to stop recording';
+    bubbleInput.classList.add('listening');
+    bubbleInput.placeholder = '🎤 Recording... click ⏹ when done';
+    bubbleInput.value = '';
+
+    console.log('🎤 Recording started');
+  } catch (err) {
+    console.error('❌ Failed to start recording:', err);
+    
+    if (err.name === 'NotAllowedError') {
+      bubbleInput.placeholder = '❌ Mic permission denied';
+    } else if (err.name === 'NotFoundError') {
+      bubbleInput.placeholder = '❌ No microphone found';
+    } else {
+      bubbleInput.placeholder = '❌ ' + err.message;
+    }
+    
+    setTimeout(() => {
+      bubbleInput.placeholder = 'Type or click mic...';
+    }, 3000);
+    
+    stopListening();
+  }
+}
+
+// ===== STOP RECORDING =====
+function stopListening() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    try {
+      mediaRecorder.stop();
+    } catch (err) {
+      console.log('MediaRecorder already stopped');
+    }
+  }
+
+  if (audioStream) {
+    audioStream.getTracks().forEach(track => track.stop());
+    audioStream = null;
+  }
+
+  isListening = false;
+
+  // Restore mood (unless transcribing — keep headphones)
+  if (!isTranscribing && currentMood === 'headphones') {
+    setMood(moodBeforeListening || 'presenting');
+  }
+
+  // Reset UI
+  bubbleMicBtn.classList.remove('listening');
+  bubbleMicBtn.textContent = '🎤';
+  bubbleMicBtn.title = 'Click to speak';
+  bubbleInput.classList.remove('listening');
+}
+
+// ===== PROCESS RECORDING =====
+async function processRecording() {
+  if (audioChunks.length === 0) {
+    console.log('🎤 No audio captured');
+    stopListening();
+    bubbleInput.placeholder = 'Type or click mic...';
+    return;
+  }
+
+  isTranscribing = true;
+  
+  // Update UI — show transcribing state
+  bubbleMicBtn.classList.add('disabled');
+  bubbleInput.placeholder = '⏳ Transcribing your voice...';
+  bubbleInput.classList.add('listening');
+  setMood('thinking');
+
+  try {
+    // Combine all audio chunks
+    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+    console.log('🎤 Audio blob size:', audioBlob.size, 'bytes');
+
+    if (audioBlob.size < 1000) {
+      console.log('🎤 Audio too short');
+      bubbleInput.placeholder = '⚠️ Too short — try again';
+      setTimeout(() => {
+        bubbleInput.placeholder = 'Type or click mic...';
+      }, 2000);
+      return;
+    }
+
+    // Convert to ArrayBuffer
+    const arrayBuffer = await audioBlob.arrayBuffer();
+
+    // Send to main process for Whisper transcription
+    console.log('📤 Sending to Whisper...');
+    const result = await window.vishalAPI.transcribeAudio(arrayBuffer, 'audio/webm');
+
+    if (result.success && result.text) {
+      console.log('✅ Got transcription:', result.text);
+      bubbleInput.value = result.text;
+      bubbleInput.placeholder = 'Edit or click Send';
+    } else {
+      console.error('❌ Transcription failed:', result.error);
+      bubbleInput.placeholder = '❌ Transcription failed — type instead';
+      setTimeout(() => {
+        bubbleInput.placeholder = 'Type or click mic...';
+      }, 3000);
+    }
+  } catch (err) {
+    console.error('❌ Processing error:', err);
+    bubbleInput.placeholder = '❌ Error — type instead';
+    setTimeout(() => {
+      bubbleInput.placeholder = 'Type or click mic...';
+    }, 3000);
+  } finally {
+    isTranscribing = false;
+    bubbleMicBtn.classList.remove('disabled');
+    bubbleInput.classList.remove('listening');
+    
+    // Restore mood
+    if (currentMood === 'thinking' || currentMood === 'headphones') {
+      setMood('presenting');
+    }
+    
+    // Focus input so user can edit/send
+    setTimeout(() => bubbleInput.focus(), 100);
+  }
+}
+
+// ===== TOGGLE LISTENING =====
+function toggleListening() {
+  if (isTranscribing) {
+    console.log('🎤 Currently transcribing, please wait...');
+    return;
+  }
+  
+  if (isListening) {
+    stopListening();
+  } else {
+    startListening();
+  }
+}
 
 // ===== IDLE BOBBING =====
 let bobDirection = 1;
@@ -98,7 +304,6 @@ container.addEventListener('mouseleave', () => (nameTag.style.opacity = '0'));
     containerStartX = rect.left;
     containerStartY = rect.top;
 
-    // ✅ Vishal being touched — make screen interactive
     window.vishalAPI.vishalActive();
 
     container.style.right = 'auto';
@@ -145,12 +350,10 @@ container.addEventListener('mouseleave', () => (nameTag.style.opacity = '0'));
     window.vishalAPI.savePosition({ x: rect.left, y: rect.top });
     console.log('📍 Position saved:', rect.left, rect.top);
 
-    // ✅ Drag done + not busy = go idle so screen is clickable again
     if (!isBusy) {
       window.vishalAPI.vishalIdle();
     }
 
-    // Tiny movement = treat as click
     if (!hasMoved && e.button === 0 && !isBusy) {
       handleVishalClick();
     }
@@ -196,6 +399,7 @@ if (window.vishalAPI && window.vishalAPI.onContextMenuAction) {
         break;
 
       case 'quit':
+        if (isListening) stopListening();
         setMood('waving');
         hideBubble();
         setTimeout(() => {
@@ -216,12 +420,12 @@ if (window.vishalAPI && window.vishalAPI.onSettingsChanged) {
   });
 }
 
-// ===== GO IDLE (screen becomes clickable) =====
-// Called every time Vishal finishes and goes home
+// ===== GO IDLE =====
 function goIdle() {
+  if (isListening) stopListening();
   isBusy = false;
-  window.vishalAPI.summonDone(); // tells main.js
-  window.vishalAPI.vishalIdle(); // restores click-through
+  window.vishalAPI.summonDone();
+  window.vishalAPI.vishalIdle();
   console.log('✅ Vishal idle — screen clickable');
 }
 
@@ -230,7 +434,6 @@ function handleVishalClick() {
   if (isBusy) return;
   isBusy = true;
 
-  // ✅ Vishal summoned — disable screen click-through
   window.vishalAPI.vishalActive();
 
   const screenW = window.innerWidth;
@@ -350,6 +553,8 @@ function showChatBubble(message) {
   bubbleLoading.classList.add('hidden');
   bubbleButtons.innerHTML = '';
   bubbleInputArea.classList.remove('hidden');
+  
+  bubbleMicBtn.classList.remove('disabled');
 
   positionBubble();
   bubble.classList.remove('hidden');
@@ -409,7 +614,6 @@ function summonWithGitHubBubble(event) {
   if (isBusy) return;
   isBusy = true;
 
-  // ✅ Vishal summoned — disable screen click-through
   window.vishalAPI.vishalActive();
 
   const screenW = window.innerWidth;
@@ -464,10 +668,8 @@ async function handleGitHubAction(action, event) {
     setMood('ok', 1500);
   }
 
-  // Walk home then go idle
   setTimeout(() => {
     walkHome(() => {
-      // ✅ Vishal home — screen clickable again
       goIdle();
     });
   }, 1800);
@@ -485,6 +687,7 @@ function showBubbleLoading() {
 
 // ===== HIDE BUBBLE =====
 function hideBubble() {
+  if (isListening) stopListening();
   bubble.classList.remove('visible');
   setTimeout(() => {
     bubble.classList.add('hidden');
@@ -494,8 +697,11 @@ function hideBubble() {
 
 // ===== SEND CHAT MESSAGE =====
 async function sendMessageToVishal(userMessage) {
+  if (isListening) stopListening();
+  
   showBubbleLoading();
   setMood('thinking');
+  
   try {
     const result = await window.vishalAPI.askVishal(userMessage);
     setMood('presenting');
@@ -516,16 +722,24 @@ bubbleSendBtn.addEventListener('click', () => {
 });
 
 bubbleInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') bubbleSendBtn.click();
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    bubbleSendBtn.click();
+  }
   if (e.key === 'Escape') bubbleCloseBtn.click();
 });
 
+// ===== MIC BUTTON HANDLER =====
+bubbleMicBtn.addEventListener('click', () => {
+  toggleListening();
+});
+
 bubbleCloseBtn.addEventListener('click', () => {
+  if (isListening) stopListening();
   hideBubble();
   setMood('waving', 1500);
   setTimeout(() => {
     walkHome(() => {
-      // ✅ Vishal home — screen clickable again
       goIdle();
     });
   }, 500);
@@ -554,25 +768,23 @@ initPosition().then(() => {
   }, 500);
 });
 
-// ===== STARTUP GREETING (wave only) =====
+// ===== STARTUP GREETING =====
 if (window.vishalAPI && window.vishalAPI.onStartupGreeting) {
   window.vishalAPI.onStartupGreeting((data) => {
     console.log('👋 Startup greeting:', data);
-    // Just wave — no walking, no bubble, no isBusy
     setMood('waving', 3000);
     nameTag.style.opacity = '1';
     setTimeout(() => { nameTag.style.opacity = '0'; }, 3000);
   });
 }
 
-// ===== LISTEN FOR CHAT SUMMON (hotkey) =====
+// ===== LISTEN FOR CHAT SUMMON =====
 if (window.vishalAPI && window.vishalAPI.onSummon) {
   window.vishalAPI.onSummon((data) => {
     console.log('Chat summon received:', data);
     if (isBusy) return;
     isBusy = true;
 
-    // ✅ Vishal summoned — disable screen click-through
     window.vishalAPI.vishalActive();
 
     const screenW = window.innerWidth;
@@ -602,4 +814,30 @@ if (window.vishalAPI && window.vishalAPI.onGitHubEvent) {
   });
 }
 
-console.log('✅ Vishal ready. Ctrl+Alt+V chat | Ctrl+Alt+G github | right-click menu | drag to move');
+// ===== LISTEN FOR VOICE INPUT HOTKEY =====
+if (window.vishalAPI && window.vishalAPI.onStartVoiceInput) {
+  window.vishalAPI.onStartVoiceInput(() => {
+    console.log('🎤 Voice input hotkey pressed');
+    
+    if (!bubble.classList.contains('visible')) {
+      if (isBusy) return;
+      isBusy = true;
+      window.vishalAPI.vishalActive();
+      
+      const screenW = window.innerWidth;
+      const screenH = window.innerHeight;
+      const centerX = screenW / 2 - 70;
+      const centerY = screenH / 2 - 100;
+      
+      walkTo(centerX, centerY, 'left', () => {
+        setMood('presenting');
+        showChatBubble("Hey boss! Click 🎤 to speak");
+        setTimeout(() => startListening(), 500);
+      });
+    } else {
+      toggleListening();
+    }
+  });
+}
+
+console.log('✅ Vishal ready. Ctrl+Alt+V chat | Ctrl+Alt+G github | Ctrl+Alt+Space voice | right-click menu | drag to move');

@@ -6,6 +6,7 @@ require('dotenv').config();
 const { askVishal, clearMemory } = require('./agents/claude-brain');
 const githubWatcher = require('./agents/github-watcher');
 const githubActions = require('./agents/github-actions');
+const { transcribeAudio } = require('./agents/whisper');
 
 let mainWindow;
 let settingsWindow = null;
@@ -21,6 +22,7 @@ const DEFAULT_SETTINGS = {
   charScale: '1.0',
   chatHotkey: 'CommandOrControl+Alt+V',
   githubHotkey: 'CommandOrControl+Alt+G',
+  voiceHotkey: 'CommandOrControl+Alt+Space',
   githubEnabled: true,
   githubInterval: 60,
   githubUsername: process.env.GITHUB_USERNAME || '',
@@ -88,10 +90,28 @@ function createWindow() {
     },
   });
 
-  // ✅ Start with click-through ON — screen is fully clickable at startup
-  // Vishal is still draggable/clickable via the forward:true option
-  // which forwards mouse events to renderer so CSS pointer-events can catch them
   mainWindow.setIgnoreMouseEvents(true, { forward: true });
+
+  // ✅ AUTO-GRANT MICROPHONE PERMISSION
+  mainWindow.webContents.session.setPermissionRequestHandler(
+    (webContents, permission, callback) => {
+      console.log('🔐 Permission requested:', permission);
+      if (permission === 'media' || permission === 'microphone' || permission === 'audioCapture') {
+        callback(true);
+      } else {
+        callback(false);
+      }
+    }
+  );
+
+  mainWindow.webContents.session.setPermissionCheckHandler(
+    (webContents, permission) => {
+      if (permission === 'media' || permission === 'microphone' || permission === 'audioCapture') {
+        return true;
+      }
+      return false;
+    }
+  );
 
   mainWindow.loadFile('renderer/index.html');
 
@@ -139,6 +159,7 @@ function registerHotkeys() {
 
   const chatKey = appSettings.chatHotkey || 'CommandOrControl+Alt+V';
   const ghKey = appSettings.githubHotkey || 'CommandOrControl+Alt+G';
+  const voiceKey = appSettings.voiceHotkey || 'CommandOrControl+Alt+Space';
 
   const chatOk = globalShortcut.register(chatKey, () => {
     console.log('>>> CHAT HOTKEY PRESSED <<<');
@@ -167,11 +188,20 @@ function registerHotkeys() {
     });
   });
   console.log(`Hotkey ${ghKey} registered:`, ghOk);
+
+  // ===== VOICE INPUT HOTKEY =====
+  const voiceOk = globalShortcut.register(voiceKey, () => {
+    console.log('>>> VOICE HOTKEY PRESSED <<<');
+    if (mainWindow) {
+      mainWindow.setIgnoreMouseEvents(false);
+      mainWindow.webContents.send('start-voice-input');
+    }
+  });
+  console.log(`Hotkey ${voiceKey} registered:`, voiceOk);
 }
 
 // ===== IPC: CORE =====
 
-// ✅ Vishal went home — restore click-through so screen works again
 ipcMain.on('summon-done', () => {
   console.log('>> Vishal home — restoring click-through');
   if (mainWindow) mainWindow.setIgnoreMouseEvents(true, { forward: true });
@@ -190,6 +220,19 @@ ipcMain.handle('ask-vishal', async (event, userMessage) => {
 
 ipcMain.on('clear-memory', () => {
   clearMemory();
+});
+
+// ===== IPC: WHISPER TRANSCRIPTION =====
+ipcMain.handle('transcribe-audio', async (event, { audioData, mimeType }) => {
+  try {
+    console.log('🎤 Received audio for transcription:', audioData.byteLength, 'bytes');
+    const buffer = Buffer.from(audioData);
+    const result = await transcribeAudio(buffer, mimeType);
+    return result;
+  } catch (err) {
+    console.error('❌ Transcribe handler error:', err);
+    return { success: false, error: err.message };
+  }
 });
 
 // ===== IPC: GITHUB =====
@@ -228,15 +271,11 @@ ipcMain.on('snooze-vishal', (event, minutes) => {
 
 // ===== IPC: MOUSE PASSTHROUGH =====
 
-// ✅ Called when drag starts OR when Vishal is summoned
-// Disables click-through so user can interact with Vishal + bubble
 ipcMain.on('vishal-active', () => {
   console.log('>> Vishal active — disabling click-through');
   if (mainWindow) mainWindow.setIgnoreMouseEvents(false);
 });
 
-// ✅ Called when Vishal goes back to corner
-// Re-enables click-through so screen is usable again
 ipcMain.on('vishal-idle', () => {
   console.log('>> Vishal idle — restoring click-through');
   if (mainWindow) mainWindow.setIgnoreMouseEvents(true, { forward: true });
@@ -369,7 +408,6 @@ ipcMain.on('quit-vishal', () => {
 function summonVishal(message, buttons) {
   console.log('>> Summoning Vishal (chat):', message);
   if (mainWindow) {
-    // ✅ Vishal is being summoned — disable click-through
     mainWindow.setIgnoreMouseEvents(false);
     mainWindow.webContents.send('summon-vishal', { message, buttons });
   }
@@ -389,7 +427,6 @@ function summonVishalForGitHubEvent(event) {
 
   console.log('>> Summoning Vishal (GitHub event):', event.title);
   if (mainWindow) {
-    // ✅ Vishal is being summoned — disable click-through
     mainWindow.setIgnoreMouseEvents(false);
     mainWindow.webContents.send('github-event', event);
   }
@@ -418,7 +455,6 @@ app.whenReady().then(async () => {
     console.error('❌ Skipping GitHub watcher — connection failed');
   }
 
-  // ✅ Startup: just wave, no bubble, no walking to center
   setTimeout(() => {
     console.log('=== STARTUP GREETING ===');
     const username = process.env.GITHUB_USERNAME || 'you';

@@ -34,7 +34,7 @@ html, body {
   user-select: none;
   -webkit-user-drag: none;
   display: block;
-  transition: opacity 0.15s ease;  /* smooth fade between poses */
+  transition: opacity 0.15s ease;
 }
 
 #vishal-name-tag {
@@ -52,10 +52,10 @@ html, body {
   pointer-events: none;
 }
 
-/* ===== THOUGHT BUBBLE (BAADAL) — FORCED SIZE ===== */
+/* ===== THOUGHT BUBBLE (BAADAL) ===== */
 #thought-bubble {
   position: absolute !important;
-  width: 300px !important;          /* FIXED width — no flexible sizing */
+  width: 300px !important;
   min-height: 100px !important;
   background: #ffffff !important;
   border: 4px solid #2c2c2c !important;
@@ -140,7 +140,7 @@ html, body {
   background: #7f8c8d !important;
 }
 
-/* Bubble tail (pointing down to Vishal's head) */
+/* Bubble tail */
 .bubble-tail {
   position: absolute;
   bottom: -18px;
@@ -209,7 +209,7 @@ html, body {
 
 #bubble-input {
   flex: 1;
-  min-width: 0;          /* allows shrinking */
+  min-width: 0;
   padding: 8px 12px !important;
   border: 2px solid #2c2c2c !important;
   border-radius: 12px !important;
@@ -218,6 +218,7 @@ html, body {
   outline: none !important;
   background: #f9f9f9 !important;
   color: #1a1a1a !important;
+  transition: all 0.2s !important;
 }
 
 #bubble-input:focus {
@@ -225,6 +226,70 @@ html, body {
   border-color: #4a90e2 !important;
 }
 
+/* Listening indicator on input */
+#bubble-input.listening {
+  background: #fff5f5 !important;
+  border-color: #e74c3c !important;
+  color: #c0392b !important;
+  font-style: italic;
+}
+
+/* ===== MIC BUTTON ===== */
+#bubble-mic-btn {
+  padding: 8px 12px !important;
+  background: #f0f0f0 !important;
+  color: #2c2c2c !important;
+  border: 2px solid #2c2c2c !important;
+  border-radius: 12px !important;
+  font-size: 16px !important;
+  cursor: pointer !important;
+  font-family: 'Segoe UI', Arial, sans-serif !important;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.2s !important;
+  line-height: 1 !important;
+}
+
+#bubble-mic-btn:hover {
+  background: #e0e0e0 !important;
+  transform: scale(1.05);
+}
+
+#bubble-mic-btn:active {
+  transform: scale(0.95);
+}
+
+/* When mic is actively listening — red pulsing */
+#bubble-mic-btn.listening {
+  background: #e74c3c !important;
+  color: white !important;
+  border-color: #c0392b !important;
+  animation: micPulse 1s infinite ease-in-out;
+}
+
+#bubble-mic-btn.listening:hover {
+  background: #c0392b !important;
+}
+
+/* When mic is disabled (Vishal thinking) */
+#bubble-mic-btn.disabled {
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}
+
+@keyframes micPulse {
+  0%, 100% { 
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7);
+  }
+  50% { 
+    transform: scale(1.08);
+    box-shadow: 0 0 0 8px rgba(231, 76, 60, 0);
+  }
+}
+
+/* ===== SEND BUTTON ===== */
 #bubble-send-btn {
   padding: 8px 16px !important;
   background: #4a90e2 !important;
@@ -235,51 +300,20 @@ html, body {
   font-weight: bold !important;
   cursor: pointer !important;
   font-family: 'Segoe UI', Arial, sans-serif !important;
-  white-space: nowrap;       /* prevents button text wrap */
-  flex-shrink: 0;            /* prevents button shrinking */
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.2s !important;
 }
 
 #bubble-send-btn:hover {
   background: #357abd !important;
 }
 
-#bubble-input-area.hidden {
-  display: none !important;
+#bubble-send-btn:active {
+  transform: scale(0.95);
 }
 
-#bubble-input {
-  flex: 1;
-  padding: 8px 12px !important;
-  border: 2px solid #2c2c2c !important;
-  border-radius: 12px !important;
-  font-size: 14px !important;
-  font-family: 'Segoe UI', Arial, sans-serif !important;
-  outline: none !important;
-  background: #f9f9f9 !important;
-  color: #1a1a1a !important;
-}
-
-#bubble-input:focus {
-  background: #fff !important;
-  border-color: #4a90e2 !important;
-}
-
-#bubble-send-btn {
-  padding: 8px 16px !important;
-  background: #4a90e2 !important;
-  color: white !important;
-  border: none !important;
-  border-radius: 12px !important;
-  font-size: 13px !important;
-  font-weight: bold !important;
-  cursor: pointer !important;
-  font-family: 'Segoe UI', Arial, sans-serif !important;
-}
-
-#bubble-send-btn:hover {
-  background: #357abd !important;
-}
-
+/* ===== CLOSE BUTTON ===== */
 #bubble-close-btn {
   position: absolute !important;
   top: -10px !important;
@@ -313,25 +347,15 @@ html, body {
   transform: scale(0.95) !important;
 }
 
-#bubble-close-btn:hover {
-  background: #c0392b !important;
-}
 /* ===== POINTER EVENT CONTROL ===== */
-
-/* 
-  Body is transparent overlay — pass all clicks through to apps below
-  EXCEPT on Vishal and the bubble
-*/
 body {
   pointer-events: none !important;
 }
 
-/* Vishal character — always clickable and draggable */
 #vishal-container {
   pointer-events: all !important;
 }
 
-/* Bubble — only clickable when visible */
 #thought-bubble.visible {
   pointer-events: all !important;
 }
