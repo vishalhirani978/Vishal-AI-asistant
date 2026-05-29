@@ -140,6 +140,35 @@ html, body {
   background: #7f8c8d !important;
 }
 
+/* ===== CONFIRMATION BUBBLE BUTTONS ===== */
+.bubble-btn.confirm-yes {
+  background: #27ae60 !important;
+  color: white !important;
+  flex: 1;
+}
+
+.bubble-btn.confirm-yes:hover {
+  background: #219a52 !important;
+  transform: scale(1.05);
+}
+
+.bubble-btn.confirm-cancel {
+  background: #e74c3c !important;
+  color: white !important;
+  flex: 1;
+}
+
+.bubble-btn.confirm-cancel:hover {
+  background: #c0392b !important;
+  transform: scale(1.05);
+}
+
+#bubble-buttons.confirm-layout {
+  display: flex !important;
+  gap: 10px !important;
+  width: 100% !important;
+}
+
 /* Bubble tail */
 .bubble-tail {
   position: absolute;

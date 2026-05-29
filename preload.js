@@ -19,6 +19,8 @@ try {
     summonDone: () => ipcRenderer.send('summon-done'),
     getScreenSize: () => ipcRenderer.invoke('get-screen-size'),
     askVishal: (message) => ipcRenderer.invoke('ask-vishal', message),
+    agentParse: (text) => ipcRenderer.invoke('agent-parse', text),
+    agentExecute: (toolName, params) => ipcRenderer.invoke('agent-execute', toolName, params),
     clearMemory: () => ipcRenderer.send('clear-memory'),
 
     // ===== WHISPER TRANSCRIPTION =====
@@ -52,6 +54,12 @@ try {
     // ===== VOICE INPUT =====
     onStartVoiceInput: (callback) =>
       ipcRenderer.on('start-voice-input', () => callback()),
+
+    // ===== CONTACTS =====
+    contactsGetAll: () => ipcRenderer.invoke('contacts-get-all'),
+    contactsAdd: (name, phone, email) => ipcRenderer.invoke('contacts-add', { name, phone, email }),
+    contactsRemove: (name) => ipcRenderer.invoke('contacts-remove', name),
+    contactsLookup: (name) => ipcRenderer.invoke('contacts-lookup', name),
 
     // ===== QUIT =====
     quitVishal: () => ipcRenderer.send('quit-vishal'),

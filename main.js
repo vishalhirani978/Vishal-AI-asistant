@@ -7,6 +7,10 @@ const { askVishal, clearMemory } = require('./agents/claude-brain');
 const githubWatcher = require('./agents/github-watcher');
 const githubActions = require('./agents/github-actions');
 const { transcribeAudio } = require('./agents/whisper');
+const { parseIntent } = require('./agents/agent-brain');
+const { findTool } = require('./agents/agent-tools');
+const { buildConfirmation, executeConfirmed } = require('./agents/agent-executor');
+const contacts = require('./agents/contacts');
 
 let mainWindow;
 let settingsWindow = null;
@@ -218,6 +222,47 @@ ipcMain.handle('ask-vishal', async (event, userMessage) => {
   return result;
 });
 
+// ===== IPC: AGENT BRAIN =====
+
+ipcMain.handle('agent-parse', async (event, userMessage) => {
+  console.log('🧠 Agent parsing:', userMessage);
+  const intent = await parseIntent(userMessage);
+  console.log('🧠 Parsed intent:', JSON.stringify(intent));
+
+  if (intent.action === 'chat') {
+    const result = await askVishal(userMessage);
+    return {
+      type: 'chat',
+      response: result.response,
+      source: result.source,
+      intent,
+    };
+  }
+
+  const tool = findTool(intent.action);
+  if (!tool) {
+    return {
+      type: 'chat',
+      response: `Sorry boss, I don't know how to do that yet.`,
+      source: 'agent',
+      intent,
+    };
+  }
+
+  const confirmation = buildConfirmation(intent.action, intent.params);
+  return {
+    type: 'confirmation',
+    confirmation,
+    intent,
+  };
+});
+
+ipcMain.handle('agent-execute', async (event, toolName, params) => {
+  console.log('🎬 Agent execute:', toolName, JSON.stringify(params));
+  const result = await executeConfirmed(toolName, params);
+  return result;
+});
+
 ipcMain.on('clear-memory', () => {
   clearMemory();
 });
@@ -247,6 +292,24 @@ ipcMain.handle('github-approve-pr', async (event, { owner, repo, prNumber }) => 
 
 ipcMain.handle('github-get-summary', async () => {
   return await githubWatcher.getGitHubSummary();
+});
+
+// ===== IPC: CONTACTS =====
+
+ipcMain.handle('contacts-get-all', () => {
+  return contacts.getAllContacts();
+});
+
+ipcMain.handle('contacts-add', async (event, { name, phone, email }) => {
+  return contacts.addContact(name, phone, email);
+});
+
+ipcMain.handle('contacts-remove', async (event, name) => {
+  return contacts.removeContact(name);
+});
+
+ipcMain.handle('contacts-lookup', async (event, name) => {
+  return contacts.resolveRecipient(name);
 });
 
 // ===== IPC: POSITION =====

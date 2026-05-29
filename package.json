@@ -15,7 +15,9 @@
     "@google/generative-ai": "^0.24.1",
     "@octokit/rest": "^19.0.13",
     "dotenv": "^17.4.2",
-    "groq-sdk": "^1.2.0"
+    "groq-sdk": "^1.2.0",
+    "nodemailer": "^8.0.9",
+    "puppeteer": "^25.1.0"
   },
   "devDependencies": {
     "electron": "^32.0.0",
@@ -41,6 +43,15 @@
       {
         "from": ".env",
         "to": ".env",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "extraResources": [
+      {
+        "from": "%USERPROFILE%/.cache/puppeteer",
+        "to": "puppeteer-cache",
         "filter": [
           "**/*"
         ]

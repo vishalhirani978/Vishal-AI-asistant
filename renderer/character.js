@@ -39,6 +39,7 @@ let isWalking = false;
 let isBusy = false;
 let currentMood = 'front';
 let currentGitHubEvent = null;
+let currentAgentConfirmation = null;
 let isDragging = false;
 let charScale = 1.0;
 let isListening = false;
@@ -609,6 +610,99 @@ function showGitHubBubble(event) {
   });
 }
 
+// ===== SHOW CONFIRMATION BUBBLE (Agent tool confirmation) =====
+function showConfirmationBubble(confirmation) {
+  console.log('🎯 Showing confirmation:', confirmation);
+  currentAgentConfirmation = confirmation;
+  currentGitHubEvent = null;
+
+  bubbleText.textContent = `${confirmation.title}\n${confirmation.description}`;
+  bubbleText.style.display = 'block';
+  bubbleText.style.whiteSpace = 'pre-line';
+  bubbleLoading.classList.add('hidden');
+  bubbleInputArea.classList.add('hidden');
+
+  bubbleButtons.innerHTML = '';
+
+  const yesBtn = document.createElement('button');
+  yesBtn.className = 'bubble-btn confirm-yes';
+  yesBtn.textContent = '✓ Yes, do it';
+  yesBtn.onclick = () => handleAgentConfirmation('yes');
+  bubbleButtons.appendChild(yesBtn);
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'bubble-btn confirm-cancel';
+  cancelBtn.textContent = '✗ Cancel';
+  cancelBtn.onclick = () => handleAgentConfirmation('cancel');
+  bubbleButtons.appendChild(cancelBtn);
+
+  setMood('pointingRight');
+
+  positionBubble();
+  bubble.classList.remove('hidden');
+  bubble.style.transform = 'scale(0)';
+  requestAnimationFrame(() => {
+    bubble.style.transform = '';
+    bubble.classList.add('visible');
+  });
+}
+
+// ===== HANDLE AGENT CONFIRMATION =====
+async function handleAgentConfirmation(choice) {
+  if (!currentAgentConfirmation) return;
+
+  const confirmation = currentAgentConfirmation;
+  currentAgentConfirmation = null;
+
+  if (choice === 'yes') {
+    hideBubble();
+    setMood('laptop');
+    window.vishalAPI.vishalIdle();
+
+    try {
+      const result = await window.vishalAPI.agentExecute(
+        confirmation.toolName,
+        confirmation.params
+      );
+
+      window.vishalAPI.vishalActive();
+      if (result.success) {
+        setMood('excited', 2000);
+        setTimeout(() => {
+          setMood('presenting');
+          showChatBubble(`✅ Done! ${result.message}`);
+        }, 300);
+      } else {
+        setMood('armsCrossed', 2000);
+        setTimeout(() => {
+          setMood('presenting');
+          showChatBubble(`❌ Sorry boss, ${result.error}`);
+        }, 300);
+      }
+    } catch (err) {
+      console.error('❌ Agent execute error:', err);
+      window.vishalAPI.vishalActive();
+      setMood('armsCrossed', 2000);
+      setTimeout(() => {
+        setMood('presenting');
+        showChatBubble('❌ Sorry boss, that didn\'t work.');
+      }, 300);
+    }
+  } else {
+    hideBubble();
+    setMood('ok', 2000);
+    setTimeout(() => {
+      showChatBubble('👍 Cancelled, boss');
+      setTimeout(() => {
+        hideBubble();
+        walkHome(() => {
+          goIdle();
+        });
+      }, 2000);
+    }, 300);
+  }
+}
+
 // ===== SUMMON WITH GITHUB BUBBLE =====
 function summonWithGitHubBubble(event) {
   if (isBusy) return;
@@ -695,19 +789,31 @@ function hideBubble() {
   }, 350);
 }
 
-// ===== SEND CHAT MESSAGE =====
+// ===== SEND CHAT MESSAGE (Agent-powered) =====
 async function sendMessageToVishal(userMessage) {
   if (isListening) stopListening();
-  
+
   showBubbleLoading();
   setMood('thinking');
-  
+
   try {
-    const result = await window.vishalAPI.askVishal(userMessage);
+    const result = await window.vishalAPI.agentParse(userMessage);
+
+    if (result.type === 'chat') {
+      setMood('presenting');
+      showChatBubble(result.response);
+      return;
+    }
+
+    if (result.type === 'confirmation') {
+      showConfirmationBubble(result.confirmation);
+      return;
+    }
+
     setMood('presenting');
-    showChatBubble(result.response);
+    showChatBubble(`Sorry boss, I'm not sure what to do with that.`);
   } catch (err) {
-    console.error('Chat error:', err);
+    console.error('Agent error:', err);
     setMood('armsCrossed');
     showChatBubble("Sorry boss, something went wrong. Try again?");
   }
@@ -736,6 +842,7 @@ bubbleMicBtn.addEventListener('click', () => {
 
 bubbleCloseBtn.addEventListener('click', () => {
   if (isListening) stopListening();
+  currentAgentConfirmation = null;
   hideBubble();
   setMood('waving', 1500);
   setTimeout(() => {
