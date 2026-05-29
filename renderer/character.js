@@ -524,25 +524,74 @@ function walkHome(callback) {
 }
 
 // ===== BUBBLE POSITIONING =====
+const bubbleTail = document.querySelector('.bubble-tail');
+
 function positionBubble() {
   const BUBBLE_WIDTH = 300;
   const BUBBLE_MARGIN = 20;
   const rect = container.getBoundingClientRect();
 
   let bubbleX = rect.left + rect.width / 2 - BUBBLE_WIDTH / 2;
-  let bubbleY = rect.top - bubble.offsetHeight - 30;
+  let bubbleY = rect.top - bubble.offsetHeight - 10;
 
   bubbleX = Math.max(
     BUBBLE_MARGIN,
     Math.min(bubbleX, window.innerWidth - BUBBLE_WIDTH - BUBBLE_MARGIN)
   );
 
-  if (bubbleY < BUBBLE_MARGIN) {
-    bubbleY = rect.bottom + 30;
-  }
+  bubbleY = Math.max(BUBBLE_MARGIN + 30, bubbleY);
 
   bubble.style.left = bubbleX + 'px';
   bubble.style.top = bubbleY + 'px';
+  alignTail();
+}
+
+function alignTail() {
+  const bubbleRect = bubble.getBoundingClientRect();
+  const charRect = container.getBoundingClientRect();
+  const charCenterX = charRect.left + charRect.width / 2;
+  const bubbleCenterX = bubbleRect.left + bubbleRect.width / 2;
+  const offset = charCenterX - bubbleCenterX;
+  const tailLeft = 50 + (offset / bubbleRect.width) * 50;
+  bubbleTail.style.left = Math.max(10, Math.min(90, tailLeft)) + '%';
+}
+
+function makeBubbleDraggable() {
+  let isDragging = false;
+  let dragStartX, dragStartY, bubbleStartX, bubbleStartY;
+
+  function onMouseDown(e) {
+    if (e.target.closest('#bubble-close-btn') || e.target.closest('#bubble-mic-btn') || e.target.closest('#bubble-send-btn')) return;
+    isDragging = true;
+    const rect = bubble.getBoundingClientRect();
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    bubbleStartX = rect.left;
+    bubbleStartY = rect.top;
+    bubble.style.cursor = 'grabbing';
+    bubble.style.transition = 'none';
+    e.preventDefault();
+  }
+
+  function onMouseMove(e) {
+    if (!isDragging) return;
+    const dx = e.clientX - dragStartX;
+    const dy = e.clientY - dragStartY;
+    bubble.style.left = (bubbleStartX + dx) + 'px';
+    bubble.style.top = (bubbleStartY + dy) + 'px';
+  }
+
+  function onMouseUp() {
+    if (!isDragging) return;
+    isDragging = false;
+    bubble.style.cursor = '';
+    bubble.style.transition = '';
+    alignTail();
+  }
+
+  bubble.addEventListener('mousedown', onMouseDown);
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup', onMouseUp);
 }
 
 // ===== SHOW CHAT BUBBLE =====
@@ -557,9 +606,9 @@ function showChatBubble(message) {
   
   bubbleMicBtn.classList.remove('disabled');
 
-  positionBubble();
   bubble.classList.remove('hidden');
   bubble.style.transform = 'scale(0)';
+  positionBubble();
   requestAnimationFrame(() => {
     bubble.style.transform = '';
     bubble.classList.add('visible');
@@ -601,9 +650,9 @@ function showGitHubBubble(event) {
     bubbleButtons.appendChild(btn);
   });
 
-  positionBubble();
   bubble.classList.remove('hidden');
   bubble.style.transform = 'scale(0)';
+  positionBubble();
   requestAnimationFrame(() => {
     bubble.style.transform = '';
     bubble.classList.add('visible');
@@ -638,9 +687,9 @@ function showConfirmationBubble(confirmation) {
 
   setMood('pointingRight');
 
-  positionBubble();
   bubble.classList.remove('hidden');
   bubble.style.transform = 'scale(0)';
+  positionBubble();
   requestAnimationFrame(() => {
     bubble.style.transform = '';
     bubble.classList.add('visible');
@@ -869,6 +918,7 @@ async function initPosition() {
 }
 
 // ===== STARTUP SEQUENCE =====
+makeBubbleDraggable();
 initPosition().then(() => {
   setTimeout(() => {
     setMood('waving', 2500);
