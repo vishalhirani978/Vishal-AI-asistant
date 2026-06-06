@@ -5,6 +5,7 @@ const vishal = document.getElementById('vishal');
 const container = document.getElementById('vishal-container');
 const nameTag = document.getElementById('vishal-name-tag');
 const bubble = document.getElementById('thought-bubble');
+let bubbleDragged = false;
 const bubbleText = document.getElementById('bubble-text');
 const bubbleButtons = document.getElementById('bubble-buttons');
 const bubbleLoading = document.getElementById('bubble-loading');
@@ -473,11 +474,20 @@ function walkTo(targetX, targetY, direction, callback) {
 
   let walkBobOffset = 0;
   let walkBobDir = 1;
+  let step = 0;
   const walkBobInterval = setInterval(() => {
-    walkBobOffset += walkBobDir * 1;
+    walkBobOffset += walkBobDir * 1.5;
     if (walkBobOffset > 6 || walkBobOffset < 0) walkBobDir *= -1;
     vishal.style.transform = `translateY(-${walkBobOffset}px)`;
-  }, 80);
+    
+    // Smooth stepping animation by alternating sprites
+    step = (step + 1) % 2;
+    if (step === 0) {
+      vishal.src = SPRITES[direction];
+    } else {
+      vishal.src = SPRITES.casual;
+    }
+  }, 130);
 
   const startTime = performance.now();
 
@@ -527,6 +537,10 @@ function walkHome(callback) {
 const bubbleTail = document.querySelector('.bubble-tail');
 
 function positionBubble() {
+  if (bubbleDragged) {
+    alignTail();
+    return;
+  }
   const BUBBLE_WIDTH = 300;
   const BUBBLE_MARGIN = 20;
   const rect = container.getBoundingClientRect();
@@ -586,6 +600,7 @@ function makeBubbleDraggable() {
     isDragging = false;
     bubble.style.cursor = '';
     bubble.style.transition = '';
+    bubbleDragged = true;
     alignTail();
   }
 
@@ -597,7 +612,15 @@ function makeBubbleDraggable() {
 // ===== SHOW CHAT BUBBLE =====
 function showChatBubble(message) {
   currentGitHubEvent = null;
-  bubbleText.textContent = message;
+  
+  // Render HTML for rich cards, or text with br for normal lines
+  if (message.includes('<') && message.includes('>')) {
+    bubbleText.innerHTML = message;
+  } else {
+    bubbleText.textContent = message;
+    bubbleText.innerHTML = bubbleText.innerHTML.replace(/\n/g, '<br>');
+  }
+  
   bubbleText.style.display = 'block';
   bubbleText.style.whiteSpace = 'normal';
   bubbleLoading.classList.add('hidden');
@@ -607,12 +630,16 @@ function showChatBubble(message) {
   bubbleMicBtn.classList.remove('disabled');
 
   bubble.classList.remove('hidden');
+  bubble.classList.remove('visible');
   bubble.style.transform = 'scale(0)';
+  
+  // Force a layout reflow so offsetHeight is correctly calculated!
+  void bubble.offsetHeight;
+  
   positionBubble();
-  requestAnimationFrame(() => {
-    bubble.style.transform = '';
-    bubble.classList.add('visible');
-  });
+  
+  bubble.classList.add('visible');
+  bubble.style.transform = '';
 
   setTimeout(() => bubbleInput.focus(), 100);
 }
@@ -651,12 +678,16 @@ function showGitHubBubble(event) {
   });
 
   bubble.classList.remove('hidden');
+  bubble.classList.remove('visible');
   bubble.style.transform = 'scale(0)';
+  
+  // Force layout reflow
+  void bubble.offsetHeight;
+  
   positionBubble();
-  requestAnimationFrame(() => {
-    bubble.style.transform = '';
-    bubble.classList.add('visible');
-  });
+  
+  bubble.classList.add('visible');
+  bubble.style.transform = '';
 }
 
 // ===== SHOW CONFIRMATION BUBBLE (Agent tool confirmation) =====
@@ -688,12 +719,16 @@ function showConfirmationBubble(confirmation) {
   setMood('pointingRight');
 
   bubble.classList.remove('hidden');
+  bubble.classList.remove('visible');
   bubble.style.transform = 'scale(0)';
+  
+  // Force layout reflow
+  void bubble.offsetHeight;
+  
   positionBubble();
-  requestAnimationFrame(() => {
-    bubble.style.transform = '';
-    bubble.classList.add('visible');
-  });
+  
+  bubble.classList.add('visible');
+  bubble.style.transform = '';
 }
 
 // ===== HANDLE AGENT CONFIRMATION =====
@@ -705,7 +740,25 @@ async function handleAgentConfirmation(choice) {
 
   if (choice === 'yes') {
     hideBubble();
-    setMood('laptop');
+    
+    // Choose appropriate mood based on tool category for contextually smooth animations
+    let executeMood = 'laptop';
+    const toolName = confirmation.toolName;
+    if (toolName.includes('whatsapp')) {
+      executeMood = 'phone';
+    } else if (toolName.includes('email') || toolName.includes('gmail')) {
+      executeMood = 'laptop';
+    } else if (toolName.includes('system')) {
+      executeMood = 'laptop';
+    } else if (toolName.includes('screen') || toolName.includes('analyze')) {
+      executeMood = 'thinking';
+    } else if (toolName.includes('calendar')) {
+      executeMood = 'laptop';
+    } else if (toolName.includes('clipboard') || toolName.includes('note')) {
+      executeMood = 'thinking';
+    }
+    setMood(executeMood);
+    
     window.vishalAPI.vishalIdle();
 
     try {
@@ -835,6 +888,7 @@ function hideBubble() {
   setTimeout(() => {
     bubble.classList.add('hidden');
     bubble.style.transform = 'scale(0)';
+    bubbleDragged = false;
   }, 350);
 }
 
@@ -906,11 +960,26 @@ async function initPosition() {
   try {
     const saved = await window.vishalAPI.getPosition();
     if (saved && saved.x !== null && saved.y !== null) {
-      console.log('📍 Restoring position:', saved);
+      // Bounds check: ensure saved position is within screen limits
+      const screenW = window.innerWidth;
+      const screenH = window.innerHeight;
+      let x = saved.x;
+      let y = saved.y;
+
+      if (x < 0 || x > screenW - 150 || y < 0 || y > screenH - 250) {
+        console.log('📍 Saved position out of bounds, resetting to default bottom-right');
+        container.style.left = 'auto';
+        container.style.top = 'auto';
+        container.style.right = '20px';
+        container.style.bottom = '20px';
+        return;
+      }
+
+      console.log('📍 Restoring position:', x, y);
       container.style.right = 'auto';
       container.style.bottom = 'auto';
-      container.style.left = saved.x + 'px';
-      container.style.top = saved.y + 'px';
+      container.style.left = x + 'px';
+      container.style.top = y + 'px';
     }
   } catch (e) {
     console.log('No saved position, using default');

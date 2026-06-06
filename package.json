@@ -16,6 +16,8 @@
     "@octokit/rest": "^19.0.13",
     "dotenv": "^17.4.2",
     "groq-sdk": "^1.2.0",
+    "imap": "^0.8.19",
+    "mailparser": "^3.9.9",
     "nodemailer": "^8.0.9",
     "puppeteer": "^25.1.0"
   },

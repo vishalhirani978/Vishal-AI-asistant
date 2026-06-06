@@ -10,7 +10,7 @@ Vishal is an Electron desktop app — a pixel art character that lives on the us
 
 **OS:** Windows 10  
 **Screen:** 1536x824  
-**Project path:** D:\projects\Vishal  
+**Project path:** C:\Users\Vishal\Downloads\VISHAL  
 **Run command:** `npm run dev` (opens DevTools) or `npm start`
 
 ---
@@ -21,7 +21,9 @@ Vishal is an Electron desktop app — a pixel art character that lives on the us
 - **groq-sdk** ^1.2.0 (primary AI — llama-3.3-70b-versatile)
 - **@google/generative-ai** ^0.24.1 (fallback AI)
 - **@octokit/rest** v19.0.13 (GitHub API — DO NOT UPGRADE, v20+ breaks CommonJS)
-- **nodemailer** (Gmail SMTP)
+- **nodemailer** (Gmail SMTP for sending)
+- **imap** (Gmail IMAP for reading inbox)
+- **mailparser** (Parse raw IMAP email data)
 - **puppeteer** ^25.1.0 (WhatsApp + Instagram web automation)
 - **dotenv** ^17.4.2
 - **electron-builder** ^24.x (for .exe)
@@ -31,7 +33,7 @@ Vishal is an Electron desktop app — a pixel art character that lives on the us
 ## FILE STRUCTURE
 
 ```
-D:\projects\Vishal
+C:\Users\Vishal\Downloads\VISHAL
 ├── main.js                    # Electron main process — window, IPC, hotkeys, app lifecycle
 ├── preload.js                 # IPC bridge — exposes vishalAPI to renderer
 ├── package.json
@@ -41,19 +43,21 @@ D:\projects\Vishal
 ├── agents/
 │   ├── claude-brain.js        # Chat AI — Groq primary, Gemini fallback, conversation memory
 │   ├── personality.js         # Vishal's personality system prompt
-│   ├── agent-brain.js         # Intent parser — sends user text to Groq, returns { action, params, confidence, reasoning }
-│   ├── agent-tools.js         # Tool registry — each tool has: name, description, params (typed), requiresConfirmation, execute()
-│   ├── agent-executor.js      # Coordinator — builds confirmation payload, executes confirmed tools
-│   ├── gmail-agent.js         # Gmail sender via nodemailer
-│   ├── whisper.js             # Voice transcription via Groq Whisper (whisper-large-v3-turbo)
-│   ├── github-watcher.js      # GitHub polling (every 60s) — PRs, issues, mentions, builds
-│   ├── github-actions.js      # GitHub actions — approve PR, comment, open in browser
-│   ├── whatsapp-agent.js      # WhatsApp sender via Puppeteer
-│   └── instagram-agent.js     # Instagram DM checker via Puppeteer
+│   ├── agent-brain.js         # Intent parser — 23 tools with examples
+│   ├── agent-tools.js         # Tool registry — 23 tools registered
+│   ├── agent-executor.js      # Coordinator — confirmation templates for all tools
+│   ├── gmail-agent.js         # Gmail: send (nodemailer) + read inbox (IMAP)
+│   ├── whatsapp-agent.js      # WhatsApp: send messages + read inbox (Puppeteer)
+│   ├── instagram-agent.js     # Instagram DM checker (Puppeteer)
+│   ├── system-agent.js        # System controls: shutdown, restart, lock, sleep, volume
+│   ├── contacts.js            # Contact book — JSON storage in userData
+│   ├── whisper.js             # Voice transcription via Groq Whisper
+│   ├── github-watcher.js      # GitHub polling (every 60s)
+│   └── github-actions.js      # GitHub actions — approve PR, comment, open in browser
 │
 ├── renderer/
 │   ├── index.html             # Main overlay page
-│   ├── style.css              # All styles — character, bubble, confirmation buttons
+│   ├── style.css              # All styles
 │   ├── character.js           # All character logic — moods, walking, voice input, agent flow
 │   ├── settings.html          # Settings panel
 │   └── settings-preload.js    # Settings IPC bridge
@@ -79,51 +83,48 @@ D:\projects\Vishal
 - ✅ Right-click context menu (chat, GitHub, snooze, settings, quit)
 - ✅ Drag to reposition + position memory across restarts
 
-### Agent System (Built)
-- ✅ Intent parser (`agent-brain.js`) — sends user text to Groq, returns structured JSON
-- ✅ Tool registry (`agent-tools.js`) — 8 tools with typed params, descriptions, requiresConfirmation
-- ✅ Confirmation flow (`agent-executor.js`) — always asks "Yes/Cancel" before executing
-- ✅ Confirmation bubble UI in `character.js` — shows title, description, Yes (green) / Cancel (red) buttons
-- ✅ Mood reactions: thinking → pointingRight → excited → thumbsUp / ok
+### Agent System
+- ✅ Intent parser (`agent-brain.js`) — 23 tools with full examples
+- ✅ Tool registry (`agent-tools.js`) — 23 tools registered
+- ✅ Confirmation flow — always asks Yes/Cancel before executing
+- ✅ Mood reactions: thinking → pointingRight → excited → thumbsUp
 
-### 8 Registered Tools
+---
+
+## ALL 23 REGISTERED TOOLS
+
 | Tool | Description |
 |------|-------------|
-| `open_url(url, name)` | Open any website |
+| `open_url(url, name?)` | Open any website |
 | `google_search(query)` | Search Google |
 | `open_youtube(search?)` | Open YouTube, optional search |
 | `open_gmail()` | Open Gmail in browser |
-| `open_whatsapp_web()` | Open WhatsApp Web |
 | `send_email(to, subject, body)` | Send email via Gmail SMTP |
-| `send_whatsapp(to, message)` | Send WhatsApp message via Puppeteer |
-| `check_instagram_dms()` | Check Instagram DMs via Puppeteer |
-
-### Gmail Agent
-- Uses `nodemailer` with Gmail SMTP (App Password required)
-- Configured via `.env`: `GMAIL_USER`, `GMAIL_APP_PASSWORD`
-- File: `agents/gmail-agent.js`
-- Tool registered in `agent-tools.js` as `send_email`
-
-### WhatsApp Agent
-- Uses Puppeteer with WhatsApp Web to send messages
-- Session persistence via Brave userDataDir
-- QR code scan flow for first-time login
-- File: `agents/whatsapp-agent.js`
-- Tool: `send_whatsapp(to, message)`
-
-### Instagram Agent
-- Uses Puppeteer with Instagram Web to check DMs
-- Session persistence via Brave userDataDir
-- Detects unread conversations and reads recent messages
-- File: `agents/instagram-agent.js`
-- Tool: `check_instagram_dms()`
+| `check_email_inbox()` | Unread count + recent senders via IMAP |
+| `get_unread_emails()` | Detailed list of unread emails |
+| `search_emails(query)` | Search Gmail by sender or subject |
+| `open_whatsapp_web()` | Open WhatsApp Web |
+| `send_whatsapp(to, message)` | Send WhatsApp via Puppeteer |
+| `check_whatsapp_inbox()` | Unread chats + previews via Puppeteer |
+| `check_instagram_dms()` | Check Instagram DMs |
+| `add_contact(name, phone?, email?)` | Add/update contact |
+| `list_contacts()` | Show all contacts |
+| `remove_contact(name)` | Delete contact |
+| `search_contact(query)` | Look up contact by name |
+| `system_shutdown(minutes?)` | Shutdown PC (immediate or scheduled) |
+| `system_restart(minutes?)` | Restart PC (immediate or scheduled) |
+| `system_cancel_shutdown()` | Cancel scheduled shutdown/restart |
+| `system_lock()` | Lock Windows screen |
+| `system_sleep()` | Sleep/suspend mode |
+| `system_volume(level)` | Set volume 0-100 |
+| `system_mute()` | Toggle mute/unmute |
 
 ---
 
 ## ARCHITECTURE PATTERNS
 
 ### Adding a New Tool
-1. Create the agent module in `agents/` (e.g., `agents/whatsapp-agent.js`)
+1. Create the agent module in `agents/` (e.g., `agents/calendar-agent.js`)
 2. Register the tool in `agents/agent-tools.js` — add to `toolRegistry` array
 3. Add template entries in `agents/agent-executor.js` — `DESCRIPTION_TEMPLATES` and `ACTION_TEMPLATES`
 4. Add to system prompt in `agents/agent-brain.js` — list under AVAILABLE TOOLS + examples
@@ -139,7 +140,6 @@ D:\projects\Vishal
   },
   requiresConfirmation: true,
   async execute(params) {
-    // Actual implementation
     return { success: true, message: 'Done!' };
   },
 }
@@ -187,44 +187,19 @@ User types/says text
 
 ---
 
-## FUTURE FEATURES (ROADMAP)
+## DEVELOPMENT PRIORITY ORDER (Updated)
 
-### 1. ✅ WhatsApp Agent (Puppeteer) — DONE
-- "Vishal, message mummy I'll be late"
-- Uses Puppeteer + WhatsApp Web to send messages
-- File: `agents/whatsapp-agent.js`
-- Tool: `send_whatsapp(to, message)`
-
-### 2. ✅ Instagram Agent (Puppeteer) — DONE
-- "Vishal, check Instagram DMs"
-- Uses Puppeteer + Instagram Web
-- File: `agents/instagram-agent.js`
-- Tool: `check_instagram_dms()`
-
-### 3. Contact Book
-- Map names to phone numbers/emails
-- "Send to John" → look up John in contacts
-- File: `agents/contacts.js`
-- JSON-based storage in userData folder
-
-### 4. Browser Automation Improvements
-- Session persistence for WhatsApp/Instagram (keep logged in)
-- QR code display in Vishal's bubble for first-time login
-- Background monitoring for new messages
-
-### 5. Calendar Agent
-- Google Calendar integration
-- "What's on my schedule today?"
-
-### 6. System Controls
-- "Vishal, shutdown in 30 minutes"
-- "Mute system volume"
-- Lock screen, sleep timer
-
-### 7. Clipboard Agent
-- "Copy this to clipboard"
-- "Paste last thing I copied"
-- "Save this note"
+1. ✅ WhatsApp agent (send) — DONE
+2. ✅ Instagram agent (check DMs) — DONE
+3. ✅ Contact book (add/list/remove/search) — DONE
+4. ✅ Gmail Inbox Intelligence (IMAP read) — DONE
+5. ✅ WhatsApp Inbox Intelligence (read unread) — DONE
+6. ✅ System Controls (shutdown/restart/lock/sleep/volume/mute) — DONE
+7. ⬜ Browser Automation Infrastructure (session persistence, QR onboarding UI)
+8. ⬜ Calendar Agent (Google Calendar integration)
+9. ⬜ Screen Awareness (screenshot + analysis)
+10. ⬜ Clipboard & Notes Agent
+11. ⬜ Character Evolution & Marketplace
 
 ---
 
@@ -238,18 +213,6 @@ After any change, verify:
 5. Hotkeys: Ctrl+Alt+V (summon), Ctrl+Alt+G (GitHub), Ctrl+Alt+Space (voice)
 6. Right-click menu still works
 7. GitHub notifications don't break
-
----
-
-## RESUME DEVELOPMENT
-
-Continue building in priority order:
-1. ✅ WhatsApp agent (Puppeteer) — DONE
-2. ✅ Instagram agent (Puppeteer) — DONE
-3. Contact book
-4. Session management for web automation
-5. Calendar agent
-6. System controls
-7. Clipboard agent
-
-Tell the AI: "I'm resuming Pixel PM development. Build the next feature from the roadmap."
+8. "Who's in my contacts?" → lists all contacts
+9. "Any unread emails?" → IMAP inbox check
+10. "Lock my PC" → confirmation → locks screen
