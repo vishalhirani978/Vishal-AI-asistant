@@ -4,6 +4,9 @@ node_modules/
 # Build output
 dist/
 
+# Chrome binaries (too large for GitHub)
+chrome/
+
 # Secrets — NEVER commit this
 .env
 
