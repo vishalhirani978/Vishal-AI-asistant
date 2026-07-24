@@ -1,4 +1,4 @@
-const { app, BrowserWindow, screen, globalShortcut, ipcMain, Menu } = require('electron');
+const { app, BrowserWindow, screen, globalShortcut, ipcMain, Menu, desktopCapturer, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 require('dotenv').config();
@@ -265,6 +265,29 @@ ipcMain.handle('agent-execute', async (event, toolName, params) => {
 
 ipcMain.on('clear-memory', () => {
   clearMemory();
+});
+
+// ===== IPC: SCREEN CAPTURE =====
+ipcMain.handle('capture-screen', async () => {
+  try {
+    console.log('📸 Capturing screen...');
+    const sources = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: { width: 1920, height: 1080 },
+    });
+    if (!sources || sources.length === 0) {
+      return { success: false, error: 'No screen sources found' };
+    }
+    const primarySource = sources[0];
+    const thumbnail = primarySource.thumbnail;
+    const dataUrl = thumbnail.toDataURL();
+    const base64 = dataUrl.split(',')[1];
+    console.log('📸 Screen captured, size:', base64.length, 'chars');
+    return { success: true, base64, dataUrl, mimeType: 'image/png' };
+  } catch (err) {
+    console.error('❌ Screen capture error:', err);
+    return { success: false, error: err.message };
+  }
 });
 
 // ===== IPC: WHISPER TRANSCRIPTION =====

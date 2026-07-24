@@ -42,6 +42,9 @@ SYSTEM CONTROLS:
 22. system_volume(level) — Set system volume 0-100
 23. system_mute() — Toggle mute/unmute
 
+SCREEN AWARENESS:
+24. analyze_screen(question?) — Take a screenshot and use AI vision to describe what's on screen. Optional: ask a specific question about what's visible.
+
 RULES:
 - Always respond with VALID JSON only — no markdown, no explanation outside JSON
 - If user wants to chat/ask question → action: "chat"
@@ -186,7 +189,22 @@ User: "Unmute the volume"
 {"action": "system_mute", "params": {}, "confidence": 0.95, "reasoning": "Toggle mute (same action)"}
 
 User: "Vishal hey there"
-{"action": "chat", "params": {"message": "Hey"}, "confidence": 1.0, "reasoning": "Just greeting"}`;
+{"action": "chat", "params": {"message": "Hey"}, "confidence": 1.0, "reasoning": "Just greeting"}
+
+User: "What's on my screen?"
+{"action": "analyze_screen", "params": {}, "confidence": 0.95, "reasoning": "User wants screen analysis"}
+
+User: "What am I looking at?"
+{"action": "analyze_screen", "params": {}, "confidence": 0.95, "reasoning": "User wants to know what's on screen"}
+
+User: "Vishal can you see my screen?"
+{"action": "analyze_screen", "params": {}, "confidence": 0.95, "reasoning": "User is asking Vishal to look at the screen"}
+
+User: "Help me with the error on my screen"
+{"action": "analyze_screen", "params": {"question": "What error is shown on this screen and how to fix it?"}, "confidence": 0.9, "reasoning": "User wants help with a visible error"}
+
+User: "What app is open?"
+{"action": "analyze_screen", "params": {"question": "What application is currently open and what is the user doing?"}, "confidence": 0.9, "reasoning": "User wants to know which app is open"}`;
 
 async function parseIntent(userMessage) {
   try {

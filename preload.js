@@ -27,6 +27,9 @@ try {
     transcribeAudio: (audioData, mimeType) =>
       ipcRenderer.invoke('transcribe-audio', { audioData, mimeType }),
 
+    // ===== SCREEN AWARENESS =====
+    captureScreen: () => ipcRenderer.invoke('capture-screen'),
+
     // ===== GITHUB =====
     onGitHubEvent: (callback) =>
       ipcRenderer.on('github-event', (event, data) => callback(data)),
@@ -48,6 +51,7 @@ try {
 
     // ===== SETTINGS =====
     openSettings: () => ipcRenderer.send('open-settings'),
+    loadSettings: () => ipcRenderer.invoke('settings-load'),
     onSettingsChanged: (callback) =>
       ipcRenderer.on('settings-changed', (event, settings) => callback(settings)),
 

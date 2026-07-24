@@ -222,6 +222,14 @@
     </div>
     <div class="hotkey-box" id="hotkeyGithub" data-field="githubHotkey" tabindex="0">Ctrl+Alt+G</div>
   </div>
+
+  <div class="row">
+    <div class="label-wrap">
+      <span class="label-name">🎤 Voice Input</span>
+      <span class="label-desc">Speak a command to Vishal</span>
+    </div>
+    <div class="hotkey-box" id="hotkeyVoice" data-field="voiceHotkey" tabindex="0">Ctrl+Alt+Space</div>
+  </div>
 </div>
 
 <!-- GitHub -->
@@ -278,6 +286,40 @@
   </div>
 </div>
 
+<!-- GitHub Account -->
+<div class="section">
+  <h2>🐙 GitHub Account</h2>
+  <div class="row">
+    <div class="label-wrap">
+      <span class="label-name">GitHub Username</span>
+      <span class="label-desc">Your GitHub handle (e.g. vishalhirani978)</span>
+    </div>
+    <input type="text" id="githubUsername" placeholder="your-username" style="min-width:180px;">
+  </div>
+</div>
+
+<!-- Screen Awareness -->
+<div class="section">
+  <h2>🖥️ Screen Awareness</h2>
+  <div class="row">
+    <div class="label-wrap">
+      <span class="label-name">How it works</span>
+      <span class="label-desc">Vishal uses Gemini Vision to analyze your screen</span>
+    </div>
+    <span style="font-size:12px;color:#4caf50;font-weight:600;">✅ Enabled</span>
+  </div>
+  <div class="row" style="flex-direction:column;align-items:flex-start;gap:8px;">
+    <span class="label-name" style="color:#90caf9;">How to use:</span>
+    <div style="font-size:12px;color:#888;line-height:1.6;">
+      Say to Vishal:<br>
+      • <code style="background:#0f3460;padding:2px 6px;border-radius:4px;">"What's on my screen?"</code><br>
+      • <code style="background:#0f3460;padding:2px 6px;border-radius:4px;">"Help me with this error"</code><br>
+      • <code style="background:#0f3460;padding:2px 6px;border-radius:4px;">"What app is open?"</code><br>
+      • <code style="background:#0f3460;padding:2px 6px;border-radius:4px;">"Can you see my screen?"</code>
+    </div>
+  </div>
+</div>
+
 <div class="btn-bar">
   <span class="settings-path" id="settingsPath">Loading path...</span>
   <button class="btn btn-reset" id="btnReset">Reset Defaults</button>
@@ -300,6 +342,8 @@
     charScale: '1.0',
     chatHotkey: 'CommandOrControl+Alt+V',
     githubHotkey: 'CommandOrControl+Alt+G',
+    voiceHotkey: 'CommandOrControl+Alt+Space',
+    githubUsername: '',
     githubEnabled: true,
     githubInterval: 60,
     notifyPR: true,
@@ -316,6 +360,8 @@
     document.getElementById('charScale').value = s.charScale || '1.0';
     document.getElementById('hotkeyChat').textContent = toDisplay(s.chatHotkey || DEFAULTS.chatHotkey);
     document.getElementById('hotkeyGithub').textContent = toDisplay(s.githubHotkey || DEFAULTS.githubHotkey);
+    document.getElementById('hotkeyVoice').textContent = toDisplay(s.voiceHotkey || DEFAULTS.voiceHotkey);
+    document.getElementById('githubUsername').value = s.githubUsername || '';
     document.getElementById('githubEnabled').checked = s.githubEnabled !== false;
     document.getElementById('githubInterval').value = s.githubInterval || 60;
     document.getElementById('notifyPR').checked = s.notifyPR !== false;
@@ -331,6 +377,8 @@
       charScale: document.getElementById('charScale').value,
       chatHotkey: toElectron(document.getElementById('hotkeyChat').textContent),
       githubHotkey: toElectron(document.getElementById('hotkeyGithub').textContent),
+      voiceHotkey: toElectron(document.getElementById('hotkeyVoice').textContent),
+      githubUsername: document.getElementById('githubUsername').value.trim(),
       githubEnabled: document.getElementById('githubEnabled').checked,
       githubInterval: parseInt(document.getElementById('githubInterval').value) || 60,
       notifyPR: document.getElementById('notifyPR').checked,

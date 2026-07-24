@@ -19,6 +19,8 @@ const BRAVE_PATHS = [
   'C:\\Program Files (x86)\\BraveSoftware\\Brave-Browser\\Application\\brave.exe',
 ];
 
+const CHROME_PATH = path.join(__dirname, '..', 'chrome', 'win64-149.0.7827.22', 'chrome-win64', 'chrome.exe');
+
 async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -49,8 +51,11 @@ async function getLaunchOptions() {
   if (bravePath) {
     launchOptions.executablePath = bravePath;
     console.log(`💬 Using Brave browser: ${bravePath}`);
+  } else if (require('fs').existsSync(CHROME_PATH)) {
+    launchOptions.executablePath = CHROME_PATH;
+    console.log(`💬 Using bundled Chrome: ${CHROME_PATH}`);
   } else {
-    console.log('💬 Brave not found, using bundled Chrome');
+    console.log('💬 Brave and bundled Chrome not found, using Puppeteer default');
   }
   console.log(`💬 Session saved in: ${sessionDir}`);
   return { pptr, launchOptions };

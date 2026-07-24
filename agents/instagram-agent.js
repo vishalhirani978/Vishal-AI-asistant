@@ -19,6 +19,8 @@ const BRAVE_PATHS = [
   'C:\\Program Files (x86)\\BraveSoftware\\Brave-Browser\\Application\\brave.exe',
 ];
 
+const CHROME_PATH = path.join(__dirname, '..', 'chrome', 'win64-149.0.7827.22', 'chrome-win64', 'chrome.exe');
+
 const SELECTORS = {
   loginButton: 'button[type="submit"]',
   usernameInput: 'input[name="username"]',
@@ -57,8 +59,13 @@ async function checkInstagramDMs() {
       launchOptions.userDataDir = sessionDir;
       console.log(`📸 Using Brave browser: ${bravePath}`);
       console.log(`📸 Session saved in: ${sessionDir}`);
+    } else if (require('fs').existsSync(CHROME_PATH)) {
+      launchOptions.executablePath = CHROME_PATH;
+      launchOptions.userDataDir = sessionDir;
+      console.log(`📸 Using bundled Chrome: ${CHROME_PATH}`);
+      console.log(`📸 Session saved in: ${sessionDir}`);
     } else {
-      console.log('📸 Brave not found, using bundled Chrome');
+      console.log('📸 Brave and bundled Chrome not found, using Puppeteer default');
     }
 
     browser = await pptr.launch(launchOptions);

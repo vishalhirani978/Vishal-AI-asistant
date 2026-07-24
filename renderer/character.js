@@ -994,6 +994,21 @@ initPosition().then(() => {
   }, 500);
 });
 
+// ===== LOAD SAVED SETTINGS ON STARTUP =====
+(async function applyStartupSettings() {
+  try {
+    if (window.vishalAPI && window.vishalAPI.loadSettings) {
+      const saved = await window.vishalAPI.loadSettings();
+      if (saved && saved.charScale) {
+        applyScale(saved.charScale);
+        console.log('📐 Applied startup charScale:', saved.charScale);
+      }
+    }
+  } catch (e) {
+    console.log('Could not apply startup settings:', e.message);
+  }
+})();
+
 // ===== STARTUP GREETING =====
 if (window.vishalAPI && window.vishalAPI.onStartupGreeting) {
   window.vishalAPI.onStartupGreeting((data) => {

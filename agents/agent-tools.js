@@ -1,9 +1,20 @@
-const { shell } = require('electron');
+const { shell, ipcMain } = require('electron');
 const { sendEmail, checkEmailInbox, getUnreadEmails, searchEmails } = require('./gmail-agent');
 const { sendWhatsApp, checkWhatsAppInbox } = require('./whatsapp-agent');
 const { checkInstagramDMs } = require('./instagram-agent');
 const contacts = require('./contacts');
 const system = require('./system-agent');
+require('dotenv').config();
+
+// ===== GEMINI VISION FOR SCREEN AWARENESS =====
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+let genAI;
+function getGenAI() {
+  if (!genAI && process.env.GEMINI_API_KEY) {
+    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  }
+  return genAI;
+}
 
 const toolRegistry = [
   // ===== BROWSER TOOLS =====
@@ -163,6 +174,16 @@ const toolRegistry = [
     async execute(params) {
       const resolved = contacts.resolveRecipient(params.to);
       const recipientPhone = resolved.phone || params.to;
+
+      // Check if we have a valid phone number (not just a name)
+      const looksLikePhone = /^[\+\d\s\-\(\)]{7,}$/.test(recipientPhone);
+      if (!looksLikePhone && !resolved.resolved) {
+        return {
+          success: false,
+          error: `No phone number found for "${params.to}". Please add them as a contact first! Say: "Add contact ${params.to} with phone +91XXXXXXXXXX"`,
+        };
+      }
+
       return await sendWhatsApp(recipientPhone, params.message);
     },
   },
@@ -249,6 +270,57 @@ const toolRegistry = [
         return { success: true, message };
       }
       return { success: false, error: `No contact found for "${params.query}"` };
+    },
+  },
+
+  // ===== SCREEN AWARENESS =====
+  {
+    name: 'analyze_screen',
+    description: 'Take a screenshot and analyze what is currently on screen using AI vision',
+    params: {
+      question: { type: 'string', required: false, description: 'Optional specific question about what you see on screen' },
+    },
+    requiresConfirmation: true,
+    async execute(params) {
+      try {
+        console.log('📸 analyze_screen: requesting screenshot...');
+        // Capture screen via main process IPC
+        const { ipcMain: ipc } = require('electron');
+        // We'll use a different approach — import the capture function directly
+        // Since we're in the main process, we use desktopCapturer directly
+        const { desktopCapturer } = require('electron');
+        const sources = await desktopCapturer.getSources({
+          types: ['screen'],
+          thumbnailSize: { width: 1280, height: 720 },
+        });
+
+        if (!sources || sources.length === 0) {
+          return { success: false, error: 'Could not capture screen' };
+        }
+
+        const dataUrl = sources[0].thumbnail.toDataURL();
+        const base64 = dataUrl.split(',')[1];
+
+        const ai = getGenAI();
+        if (!ai) {
+          return { success: false, error: 'Gemini API key not set. Add GEMINI_API_KEY to your .env file.' };
+        }
+
+        const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const question = params.question || 'Describe what you see on this screen in detail. What application is open? What is the user doing?';
+
+        const result = await model.generateContent([
+          question,
+          { inlineData: { mimeType: 'image/png', data: base64 } },
+        ]);
+
+        const text = result.response.text();
+        console.log('👁️ Screen analysis:', text.substring(0, 100));
+        return { success: true, message: text };
+      } catch (err) {
+        console.error('❌ analyze_screen error:', err.message);
+        return { success: false, error: `Screen analysis failed: ${err.message}` };
+      }
     },
   },
 
