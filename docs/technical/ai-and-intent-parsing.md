@@ -18,7 +18,7 @@ graph TD
 ```
 
 ### Groq Intent Parser (`agents/agent-brain.js`)
-- Uses `llama-3.3-70b-versatile` due to its high speed and complex reasoning.
+- Uses `openai/gpt-oss-120b` due to its high speed and complex reasoning.
 - Uses a system prompt containing tool descriptions and strictly formatted JSON examples.
 - **Strict Output Format**:
   ```json
@@ -36,8 +36,8 @@ graph TD
 ## 2. Chat Processing & Fallback (`agents/claude-brain.js`)
 
 If the action is classified as `chat`, the conversation is processed in a resilient fallback setup:
-1. **Primary Model**: Groq `llama-3.3-70b-versatile` processes the chat using Vishal's custom personality instructions (`personality.js`).
-2. **Fallback Model**: If Groq API rate limits are hit or the endpoint fails, the app automatically fails over to the Gemini API (`gemini-1.5-flash`).
+1. **Primary Model**: Groq `openai/gpt-oss-120b` processes the chat using Vishal's custom personality instructions (`personality.py`).
+2. **Fallback Model**: If Groq API rate limits are hit or the endpoint fails, the app automatically fails over to the Gemini API (`gemini-2.5-flash`).
 3. **Memory Persistence**: Up to 10 historical conversation turns (`user`/`assistant`) are stored in memory to maintain context.
 
 ---

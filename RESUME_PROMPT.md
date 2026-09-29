@@ -18,7 +18,7 @@ Vishal is an Electron desktop app — a pixel art character that lives on the us
 ## TECH STACK
 
 - **Electron** ^32.0.0 (Windows desktop)
-- **groq-sdk** ^1.2.0 (primary AI — llama-3.3-70b-versatile)
+- **groq-sdk** (primary AI — openai/gpt-oss-120b)
 - **@google/generative-ai** ^0.24.1 (fallback AI)
 - **@octokit/rest** v19.0.13 (GitHub API — DO NOT UPGRADE, v20+ breaks CommonJS)
 - **nodemailer** (Gmail SMTP for sending)

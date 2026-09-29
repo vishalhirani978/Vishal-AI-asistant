@@ -35,6 +35,7 @@ const DEFAULT_SETTINGS = {
   notifyMentions: true,
   notifyBuilds: true,
   autoStart: false,
+  voiceEnabled: false,
 };
 
 function loadSettings() {

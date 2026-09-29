@@ -49,6 +49,58 @@ let mediaRecorder = null;
 let audioChunks = [];
 let audioStream = null;
 let moodBeforeListening = 'presenting';
+let voiceEnabled = false;
+
+// ===== VOICE FEEDBACK (TTS) =====
+let activeUtterance = null;
+function speakText(text) {
+  if (!voiceEnabled) return;
+  
+  try {
+    stopSpeaking();
+
+    if (!window.speechSynthesis) {
+      console.warn('speechSynthesis not supported in this environment');
+      return;
+    }
+
+    let cleanText = text
+      .replace(/<[^>]*>/g, '') // remove HTML
+      .replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '') // remove emojis
+      .replace(/[✓✗✕⚙️📊🎯🤖🐙💬📧📱]/g, '') // remove specific symbol characters
+      .trim();
+
+    if (!cleanText) return;
+
+    console.log('🗣️ Speaking:', cleanText);
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    
+    const voices = window.speechSynthesis.getVoices();
+    const preferredVoice = voices.find(v => 
+      v.lang.startsWith('en') && 
+      (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Zira') || v.name.includes('David'))
+    ) || voices.find(v => v.lang.startsWith('en'));
+    
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
+    }
+
+    utterance.rate = 1.05;
+    utterance.pitch = 1.1;
+    
+    activeUtterance = utterance;
+    window.speechSynthesis.speak(utterance);
+  } catch (err) {
+    console.error('Error during TTS:', err);
+  }
+}
+
+function stopSpeaking() {
+  if (window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+  }
+  activeUtterance = null;
+}
 
 // ===== APPLY SAVED SCALE =====
 function applyScale(scale) {
@@ -77,6 +129,9 @@ window.setMood = setMood;
 async function startListening() {
   if (isBusy && !bubble.classList.contains('visible')) return;
   if (isListening || isTranscribing) return;
+
+  // Stop any active speech to avoid self-pickup
+  stopSpeaking();
 
   try {
     console.log('🎤 Requesting microphone...');
@@ -419,6 +474,11 @@ if (window.vishalAPI && window.vishalAPI.onContextMenuAction) {
 if (window.vishalAPI && window.vishalAPI.onSettingsChanged) {
   window.vishalAPI.onSettingsChanged((settings) => {
     if (settings.charScale) applyScale(settings.charScale);
+    if (settings.voiceEnabled !== undefined) {
+      voiceEnabled = !!settings.voiceEnabled;
+      console.log('🗣️ Settings voiceEnabled updated:', voiceEnabled);
+      if (!voiceEnabled) stopSpeaking();
+    }
   });
 }
 
@@ -641,6 +701,8 @@ function showChatBubble(message) {
   bubble.classList.add('visible');
   bubble.style.transform = '';
 
+  speakText(message);
+
   setTimeout(() => bubbleInput.focus(), 100);
 }
 
@@ -688,6 +750,8 @@ function showGitHubBubble(event) {
   
   bubble.classList.add('visible');
   bubble.style.transform = '';
+
+  speakText(`${event.title}. ${event.message}`);
 }
 
 // ===== SHOW CONFIRMATION BUBBLE (Agent tool confirmation) =====
@@ -729,6 +793,8 @@ function showConfirmationBubble(confirmation) {
   
   bubble.classList.add('visible');
   bubble.style.transform = '';
+
+  speakText(`${confirmation.title}. ${confirmation.description}`);
 }
 
 // ===== HANDLE AGENT CONFIRMATION =====
@@ -884,6 +950,7 @@ function showBubbleLoading() {
 // ===== HIDE BUBBLE =====
 function hideBubble() {
   if (isListening) stopListening();
+  stopSpeaking();
   bubble.classList.remove('visible');
   setTimeout(() => {
     bubble.classList.add('hidden');
@@ -895,6 +962,7 @@ function hideBubble() {
 // ===== SEND CHAT MESSAGE (Agent-powered) =====
 async function sendMessageToVishal(userMessage) {
   if (isListening) stopListening();
+  stopSpeaking();
 
   showBubbleLoading();
   setMood('thinking');
@@ -999,9 +1067,15 @@ initPosition().then(() => {
   try {
     if (window.vishalAPI && window.vishalAPI.loadSettings) {
       const saved = await window.vishalAPI.loadSettings();
-      if (saved && saved.charScale) {
-        applyScale(saved.charScale);
-        console.log('📐 Applied startup charScale:', saved.charScale);
+      if (saved) {
+        if (saved.charScale) {
+          applyScale(saved.charScale);
+          console.log('📐 Applied startup charScale:', saved.charScale);
+        }
+        if (saved.voiceEnabled !== undefined) {
+          voiceEnabled = !!saved.voiceEnabled;
+          console.log('🗣️ Applied startup voiceEnabled:', voiceEnabled);
+        }
       }
     }
   } catch (e) {

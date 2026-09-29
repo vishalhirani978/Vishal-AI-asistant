@@ -82,7 +82,7 @@ async function askGroq(userMessage) {
   
   const completion = await groq.chat.completions.create({
     messages: messages,
-    model: 'llama-3.3-70b-versatile',
+    model: 'openai/gpt-oss-120b',
     temperature: 0.7,
     max_tokens: 250,
     top_p: 0.9
@@ -97,9 +97,8 @@ async function askGroq(userMessage) {
 async function askGemini(userMessage) {
   const systemPrompt = VISHAL_PERSONALITY || "You are Vishal, a friendly AI assistant. Reply in short English sentences.";
   
-  // Use the current Gemini model name (gemini-1.5-flash is stable and free)
   const model = gemini.getGenerativeModel({ 
-    model: 'gemini-1.5-flash',
+    model: 'gemini-2.5-flash',
     systemInstruction: systemPrompt
   });
   

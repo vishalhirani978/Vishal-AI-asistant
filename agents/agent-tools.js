@@ -306,7 +306,7 @@ const toolRegistry = [
           return { success: false, error: 'Gemini API key not set. Add GEMINI_API_KEY to your .env file.' };
         }
 
-        const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
         const question = params.question || 'Describe what you see on this screen in detail. What application is open? What is the user doing?';
 
         const result = await model.generateContent([

@@ -200,6 +200,14 @@
       <option value="1.5">Extra Large (150%)</option>
     </select>
   </div>
+
+  <div class="row">
+    <div class="label-wrap">
+      <span class="label-name">Voice feedback (TTS)</span>
+      <span class="label-desc">Speak Vishal's thought bubble replies aloud</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="voiceEnabled"><span class="slider"></span></label>
+  </div>
 </div>
 
 <!-- Hotkeys -->
@@ -350,6 +358,7 @@
     notifyIssues: true,
     notifyMentions: true,
     notifyBuilds: true,
+    voiceEnabled: false,
   };
 
   let current = { ...DEFAULTS };
@@ -368,6 +377,7 @@
     document.getElementById('notifyIssues').checked = s.notifyIssues !== false;
     document.getElementById('notifyMentions').checked = s.notifyMentions !== false;
     document.getElementById('notifyBuilds').checked = s.notifyBuilds !== false;
+    document.getElementById('voiceEnabled').checked = !!s.voiceEnabled;
   }
 
   function readFromUI() {
@@ -385,6 +395,7 @@
       notifyIssues: document.getElementById('notifyIssues').checked,
       notifyMentions: document.getElementById('notifyMentions').checked,
       notifyBuilds: document.getElementById('notifyBuilds').checked,
+      voiceEnabled: document.getElementById('voiceEnabled').checked,
     };
   }
 

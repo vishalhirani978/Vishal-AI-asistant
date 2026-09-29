@@ -24,5 +24,14 @@ Thumbs.db
 # Lock file (optional — remove this line if you want to commit it)
 # package-lock.json
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.spec
+venv/
+.venv/
+
 # Stale subfolder — this was an error
 pixel-pm/
+temp/
